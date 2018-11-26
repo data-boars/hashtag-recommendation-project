@@ -1,0 +1,3 @@
+[submodule "src/data"]
+	path = src/data
+	url = https://github.com/dzkb/twitter-streaming-fetching.git
