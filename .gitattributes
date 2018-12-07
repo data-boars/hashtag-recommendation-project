@@ -1,0 +1,2 @@
+data/processed/tagged.zip filter=lfs diff=lfs merge=lfs -text
+data/processed/processed.pkl filter=lfs diff=lfs merge=lfs -text
