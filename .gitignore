@@ -357,6 +357,4 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.gitignore.io/api/vim,macos,linux,python,pycharm,windows,intellij,jupyternotebook,visualstudiocode
-
-/data/processed
 !.md
