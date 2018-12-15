@@ -1,5 +1,4 @@
-
-from data.data_loader import (
+from tweet_recommendations.data_processing.data_loader import (
     get_cleared_dataset_without_specific_content,
     load_dataset_as_dataframe_with_given_fields,
     tokenize_tweet_content_to_types,
@@ -15,4 +14,3 @@ tokenized_dataset = tokenize_tweet_content_to_types(
     ["url", "emoji", "mention", "smiley", "number", "hashtag"],
 )
 save_dataset_as_pickle(tokenized_dataset)
-print("dupa")
