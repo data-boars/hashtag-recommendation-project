@@ -16,6 +16,11 @@ def save_dataset_as_pickle(dataset, filename="output_dataset.pkl"):
     dataset.to_pickle(OUTPUT_DATA_PATH.format(filename=filename))
 
 
+def convert_hashtags_dicts_to_list(tweets_df):
+    assert 'hashtags' in tweets_df
+    tweets_df['hashtags'] = tweets_df['hashtags'].apply(lambda x: [item['text'] for item in x])
+    return tweets_df
+
 def extract_hashtags(list_of_dicts):
     output_hashtags = []
     for hash_dict in list_of_dicts:
