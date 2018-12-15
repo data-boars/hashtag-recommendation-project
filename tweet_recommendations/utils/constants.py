@@ -1,3 +1,3 @@
-
-EXTERNAL_DATA_PATH = "/Users/jakubmichalowski/Workspace/hashtag-recommendation-project/data_processing/external_data/{filename}"
-OUTPUT_DATA_PATH = "/Users/jakubmichalowski/Workspace/hashtag-recommendation-project/data_processing/output_data/{filename}"
+EXTERNAL_DATA_PATH = "/path/to/be/determined/{filename}"
+OUTPUT_DATA_PATH = "/path/to/be/determined/{filename}"
+WORD2VEC_MODEL_PATH = "/path/to/model"
