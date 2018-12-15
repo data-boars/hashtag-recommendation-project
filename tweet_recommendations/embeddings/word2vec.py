@@ -18,16 +18,12 @@ def get_tweets_embeddings(twitter_data):
 
 def get_tweet_embedding(tweet_word_list):
     model = KeyedVectors.load_word2vec_format(WORD2VEC_MODEL_PATH, binary=False)
-    meaned_word_vector = np.zeros(100)
-    count_valid_embeddings = 0
+    all_embeddings = []
     for word in tweet_word_list:
         try:
             word_embedding = model[word.lower()]
-            meaned_word_vector = np.add(word_embedding, meaned_word_vector)
-            count_valid_embeddings += 1
+            all_embeddings.append(word_embedding)
         except Exception:
-            count_valid_embeddings -= 1
             print("Key '{}' not found in w2v dict".format(word))
-    meaned_word_vector /= len(tweet_word_list)
     del model
-    return meaned_word_vector
+    return np.mean(all_embeddings, axis=0)
