@@ -1,5 +1,6 @@
 import pandas as pd
 import preprocessor as p
+import pickle
 
 from tweet_recommendations.utils.constants import EXTERNAL_DATA_PATH, OUTPUT_DATA_PATH
 
@@ -58,3 +59,21 @@ def get_filter_obejcts_as_tuple(text_content_types):
         filter_types.append(p.OPT.NUMBER)
     tuple_to_unpack = tuple(filter_types)
     return tuple_to_unpack
+
+
+def load_toyger_data(path):
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
+    valid_data = [x for x in data if x[-1] == 'ok']
+    return valid_data
+
+
+def save_tweet_averge_word_embedding(dataframe, path_to_save_embeddings):
+    with open(path_to_save_embeddings, 'wb') as f:
+        pickle.dump(dataframe, f)
+
+
+def load_tweet_embedding_csv(path_to_embedding):
+    with open(path_to_embedding, 'rb') as f:
+        data = pickle.load(f)
+    return data
