@@ -4,10 +4,11 @@ import networkx as nx
 import numpy as np
 import scipy.spatial
 import tqdm
+from typing import *
 
 from tweet_recommendations.data_processing.data_loader import convert_hashtags_dicts_to_list
 
-def _create_progress_bar(what_type=None):
+def _create_progress_bar(what_type: Optional[str] = None):
     if what_type == 'notebook':
         return tqdm.tqdm_notebook
     elif what_type == 'text':
