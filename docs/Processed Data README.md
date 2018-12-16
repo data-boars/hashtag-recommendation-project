@@ -25,12 +25,6 @@ Each processed text as saved in separate file in format `<tweet_id>.tagget.txt`.
 files contains data provided by `tagger-toyger`, including POS tag, either word is old fashioned or not,
 possible disambiguations, index in the analysed sentenced.
 
-## File `embeddings.pkl`
-Contains pandas.DataFrame with following schema:
-1. `tweet_id` - id of tweet which embedding corresponds to
-2. `embeddings` - vector of 300 elements, calculated as a mean of tweets' words' vectors 
-
-Embeddings where calculated using polish fastText model named `kgr10.plain.skipgram.dim300.neg10.bin`.
 ## Snippets
 Load processed and lemmatised data:
 ```python
@@ -43,10 +37,4 @@ Filtering:
 ```python
 ok_data = [x for x in data if x[-1] == 'ok']
 not_ok_data = [x for x in data if [-1] == 'not ok']
-```
-
-Loading fastText embeddings:
-```python
-import pandas as pd
-embeddings = pd.read_pickle('<path_to_embeddings.pkl>')
 ```
