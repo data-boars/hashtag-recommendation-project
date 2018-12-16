@@ -72,6 +72,14 @@ def calculate_edge_weights(G: nx.Graph, progress_bar=None):
         return G
 
 
+def calculate_pagerank(G: nx.Graph):
+
+    graph_pagerank = nx.pagerank(G)
+    nx.set_node_attributes(G, graph_pagerank, 'pagerank')
+
+    return G
+
+
 def build_graph_pipeline(tweets_df, embeddings_df, progress_bar=None):
 
     assert 'embedding' in embeddings_df
@@ -87,13 +95,14 @@ def build_graph_pipeline(tweets_df, embeddings_df, progress_bar=None):
     G = build_base_tweets_graph(df, progress_bar)
     G = calculate_hashtag_embeddings(G, progress_bar)
     G = calculate_edge_weights(G, progress_bar)
+    G = calculate_pagerank(G)
     return G
 
 
 if __name__ == '__main__':
-    tweets_df = pd.read_pickle('./data_processing/source_data/original_tweets.p')
+    tweets_df = pd.read_pickle('../../data/source_data/original_tweets.p')
     tweets_df['hashtags'] = tweets_df['hashtags'].apply(lambda x: [item['text'] for item in x])
-    embeddings_df = pd.read_pickle('./data_processing/embeddings/embeddings.pkl')
+    embeddings_df = pd.read_pickle('../../data/embeddings/embeddings.pkl')
     embeddings_df['tweet_id'] = embeddings_df['tweet_id'].astype(np.int64)
     embeddings_df = embeddings_df.rename({'embeddings': 'embedding'}, axis='columns')
 
@@ -102,6 +111,7 @@ if __name__ == '__main__':
     G = build_base_tweets_graph(df, 'text')
     G = calculate_hashtag_embeddings(G, 'text')
     G = calculate_edge_weights(G, 'text')
+    G = calculate_pagerank(G)
 
-    with open('./data_processing/graphs/graph.p', 'wb') as f:
+    with open('../data_processing/graphs/graph.p', 'wb') as f:
         pickle.dump(G, f)
