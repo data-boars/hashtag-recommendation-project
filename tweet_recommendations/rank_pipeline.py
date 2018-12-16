@@ -7,13 +7,14 @@ sample_tweet_content = (
 use_w2v_embedding = True
 
 
-def get_hashtag_rank_for_given_tweet_text(tweet):
-    # sample_tweet_content = some_method_to_tag_and_lemmatze_tweet_content(sample_tweet_content)
+def get_hashtag_rank_for_given_tweet_text(tweet: str):
+    # sample_tweet_content = some_method_to_tag_and_lemmatze_tweet_content(tweet)
+    dummy_lemmatized_tweet_content = ["Przykładowa", "treść", "tweeta", "itp"]
 
     embeddings = (
-        get_w2v_tweet_embedding(tweet)
+        get_w2v_tweet_embedding(dummy_lemmatized_tweet_content)
         if use_w2v_embedding
-        else get_fasttext_tweet_embedding(tweet)
+        else get_fasttext_tweet_embedding(dummy_lemmatized_tweet_content)
     )
 
     hashtag_rank = []
