@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import numpy as np
 import pandas as pd
 
@@ -5,7 +7,9 @@ import fastText
 from tweet_recommendations.utils.constants import FASTTEXT_MODEL_PATH
 
 
-def get_fasttext_tweets_embeddings(twitter_data):
+def get_fasttext_tweets_embeddings(
+    twitter_data: List[Tuple(str, List[str], str)]
+) -> pd.DataFrame:
     id_list = []
     meaned_word_vector_list = []
     for tweet_id, tweet_word_list, status in twitter_data:
@@ -16,7 +20,7 @@ def get_fasttext_tweets_embeddings(twitter_data):
     )
 
 
-def get_fasttext_tweet_embedding(tweet_word_list):
+def get_fasttext_tweet_embedding(tweet_word_list: List[str]) -> np.ndarray:
     all_embeddings = []
     embedding_model = fastText.load_model(FASTTEXT_MODEL_PATH)
     for word in tweet_word_list:
