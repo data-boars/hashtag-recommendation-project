@@ -1,7 +1,9 @@
+from typing import Any, List
+
 import numpy as np
 
 
-def average_precision_at_k(actual, predicted, k=5):
+def average_precision_at_k(actual: List[Any], predicted: List[Any], k=5) -> float:
     if len(predicted) > k:
         predicted = predicted[:k]
 
@@ -19,5 +21,7 @@ def average_precision_at_k(actual, predicted, k=5):
     return score / min(len(actual), k)
 
 
-def mean_average_precision_at_k(actual, predicted, k=5):
-    return np.mean([average_precision_at_k(a, p, k) for a, p in zip(actual, predicted)])
+def mean_average_precision_at_k(actual: List[Any], predicted: List[Any], k=5) -> float:
+    return float(
+        np.mean([average_precision_at_k(a, p, k) for a, p in zip(actual, predicted)])
+    )
