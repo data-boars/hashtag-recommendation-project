@@ -88,7 +88,8 @@ def build_graph_pipeline(tweets_df, embeddings_df, progress_bar=None):
     assert 'hashtags' in tweets_df
     assert 'id' in tweets_df
 
-    if isinstance(tweets_df['hashtags'][tweets_df['hashtags'].str.len()>0].iloc[0][0], dict):
+    tweets_with_tags = tweets_df['hashtags'][tweets_df['hashtags'].str.len()>0]
+    if tweets_with_tags.apply(lambda tags: all(isinstance(x, dict) for x in tags)).all():
         tweets_df = convert_hashtags_dicts_to_list(tweets_df)
 
     df = tweets_df.merge(embeddings_df, on='id')
