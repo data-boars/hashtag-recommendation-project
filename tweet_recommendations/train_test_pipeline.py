@@ -1,16 +1,16 @@
 from typing import Any, List
 
-from tweet_recommendations.embeddings.fast_text import get_fasttext_tweets_embeddings
-from tweet_recommendations.embeddings.word2vec import get_w2v_tweets_embeddings
-from tweet_recommendations.rank_pipeline import get_hashtag_rank_for_given_tweet_text
-from tweet_recommendations.utils.constants import TOYGER_DATA_FILE_PATH
-from tweet_recommendations.utils.data_loader import (
+from tweet_recommendations.data_processing.data_loader import (
     get_cleared_dataset_without_specific_content,
     load_dataset_as_dataframe_with_given_fields,
     load_toyger_data,
     save_dataset_as_pickle,
     tokenize_tweet_content_to_types,
 )
+from tweet_recommendations.embeddings.fast_text import get_fasttext_tweets_embeddings
+from tweet_recommendations.embeddings.word2vec import get_w2v_tweets_embeddings
+from tweet_recommendations.rank_pipeline import get_hashtag_rank_for_given_tweet_text
+from tweet_recommendations.utils.constants import TOYGER_DATA_FILE_PATH
 from tweet_recommendations.utils.metrics import mean_average_precision_at_k
 
 use_w2v_embedding = True
