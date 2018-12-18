@@ -54,7 +54,7 @@ def get_cleared_dataset_without_specific_content(
     return dataset
 
 
-def get_filter_obejcts_as_tuple(text_content_types: List[str]):
+def get_filter_objects_as_tuple(text_content_types: List[str]):
     lower_case_types = [string_type.lower() for string_type in text_content_types]
     filter_types = []
     if "url" in lower_case_types:
