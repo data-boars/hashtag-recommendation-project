@@ -15,10 +15,6 @@ def load_dataset_as_dataframe_with_given_fields(
     return dataset
 
 
-def save_dataset_as_pickle(dataset: pd.DataFrame):
-    dataset.to_pickle(OUTPUT_DATA_PATH)
-
-
 def convert_hashtags_dicts_to_list(tweets_df: pd.DataFrame) -> pd.DataFrame:
     assert "hashtags" in tweets_df
     tweets_df["hashtags"] = tweets_df["hashtags"].apply(
