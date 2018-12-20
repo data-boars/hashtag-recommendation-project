@@ -4,13 +4,11 @@ from typing import Dict, List, Tuple
 import pandas as pd
 import preprocessor as p
 
-from tweet_recommendations.utils.constants import EXTERNAL_DATA_PATH, OUTPUT_DATA_PATH
-
 
 def load_dataset_as_dataframe_with_given_fields(
-    fields=("hashtags", "text", "retweet_count", "id")
+    path: str, fields=("hashtags", "text", "retweet_count", "id")
 ) -> pd.DataFrame:
-    tweets_df = pd.read_pickle(EXTERNAL_DATA_PATH)
+    tweets_df = pd.read_pickle(path)
     dataset = pd.DataFrame(tweets_df)[fields]
     return dataset
 
@@ -34,7 +32,7 @@ def tokenize_tweet_content_to_types(
     dataset: pd.DataFrame, tokenize_type_list: List[str]
 ) -> pd.DataFrame:
     """Tokenize all tweets with with defined contents i.e 'something #DataScience' with 'something $HASHTAG$' """
-    tuple_to_unpack = get_filter_obejcts_as_tuple(tokenize_type_list)
+    tuple_to_unpack = get_filter_objects_as_tuple(tokenize_type_list)
     p.set_options(*tuple_to_unpack)
     dataset["text"] = dataset["text"].apply(lambda txt: p.tokenize(txt))
     return dataset
@@ -44,7 +42,7 @@ def get_cleared_dataset_without_specific_content(
     dataset: pd.DataFrame, clearing_type_list: List[str]
 ) -> pd.DataFrame:
     dataset["hashtags"] = dataset["hashtags"].apply(lambda txt: extract_hashtags(txt))
-    tuple_to_unpack = get_filter_obejcts_as_tuple(clearing_type_list)
+    tuple_to_unpack = get_filter_objects_as_tuple(clearing_type_list)
     p.set_options(*tuple_to_unpack)
     dataset["text"] = dataset["text"].apply(lambda txt: p.clean(txt))
     return dataset
