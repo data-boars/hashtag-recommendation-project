@@ -16,7 +16,7 @@ def parse_wcrft_response(xml_response: str) -> List[str]:
 
 
 def get_wcrft2_results_for_text(tweet_to_process: str) -> List[str]:
-    lemmatized_tweet_words_as_list = []
+    tagged_tweet_words_as_list = []
     request_body = WCRFT2_JSON_TEMPLATE
     request_body["text"] = tweet_to_process
 
@@ -28,11 +28,11 @@ def get_wcrft2_results_for_text(tweet_to_process: str) -> List[str]:
     if status_code == 200:
         r.encoding = "ISO-8859-1"
         xml_response = r.content
-        lemmatized_tweet_words_as_list = parse_wcrft_response(xml_response)
+        tagged_tweet_words_as_list = parse_wcrft_response(xml_response)
     else:
         print(
             "Something went wrong with clarin service - status code: {}".format(
                 status_code
             )
         )
-    return lemmatized_tweet_words_as_list
+    return tagged_tweet_words_as_list
