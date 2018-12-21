@@ -7,7 +7,7 @@ import fastText
 
 
 def get_fasttext_tweets_embeddings(
-    twitter_data: List[Tuple(str, List[str], str)], fasttext_model_path: str
+    twitter_data: List[Tuple[str, List[str], str]], fasttext_model_path: str
 ) -> pd.DataFrame:
     id_list = []
     meaned_word_vector_list = []
