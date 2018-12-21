@@ -69,7 +69,7 @@ def get_filter_objects_as_tuple(text_content_types: List[str]):
     return tuple_to_unpack
 
 
-def load_toyger_data(path: str) -> List[Tuple(str, List[str], str)]:
+def load_toyger_data(path: str) -> List[Tuple[str, List[str], str]]:
     with open(path, "rb") as f:
         data = pickle.load(f)
     valid_data = [x for x in data if x[-1] == "ok"]
