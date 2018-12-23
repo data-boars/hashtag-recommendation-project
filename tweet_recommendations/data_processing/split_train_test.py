@@ -21,7 +21,7 @@ def split_by_user(tweets_df: pd.DataFrame):
         test_size=0.5,
         stratify=val_test_users["log_retweet_count"],
     )
-
+    
     return {
         "train": tweets_df[tweets_df["user"].isin(train_users)],
         "val": tweets_df[tweets_df["user"].isin(val_users)],
