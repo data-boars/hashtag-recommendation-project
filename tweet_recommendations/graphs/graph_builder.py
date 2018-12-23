@@ -12,20 +12,15 @@ from tweet_recommendations.data_processing.data_loader import (
 )
 
 
-def _create_progress_bar(what_type: Optional[str] = None):
-    if what_type == "notebook":
-        return tqdm.tqdm_notebook
-    elif what_type == "text":
-        return tqdm.tqdm
-    else:
-        return lambda iterable, total: iterable
+def _dummy_progressbar(iterable: Iterable, **kwargs):
+    return iterable
 
 
-def build_base_tweets_graph(tweets_df: pd.DataFrame, progress_bar=None):
+def build_base_tweets_graph(tweets_df: pd.DataFrame, progress_bar=_dummy_progressbar):
 
-    assert "embedding" in tweets_df
     assert "id" in tweets_df
     assert "hashtags" in tweets_df
+    assert "retweet_count" in tweets_df
     assert tweets_df["hashtags"].apply(lambda x: isinstance(x, list)).all()
     assert (
         tweets_df["hashtags"]
@@ -34,12 +29,11 @@ def build_base_tweets_graph(tweets_df: pd.DataFrame, progress_bar=None):
     )
 
     G = nx.Graph()
-    progress_bar = _create_progress_bar(progress_bar)
     for row in progress_bar(tweets_df.itertuples(), total=len(tweets_df)):
         if row.hashtags:
             G.add_node(row.id)
-            G.node[row.id]["embedding"] = row.embedding
             G.node[row.id]["node_type"] = "tweet"
+            G.node[row.id]["retweets"] = row.retweet_count
             for hashtag in row.hashtags:
                 G.add_node(hashtag)
                 G.node[hashtag]["node_type"] = "hashtag"
@@ -48,45 +42,69 @@ def build_base_tweets_graph(tweets_df: pd.DataFrame, progress_bar=None):
     return G
 
 
-def calculate_hashtag_embeddings(G: nx.Graph, progress_bar=None):
-    progress_bar = _create_progress_bar(progress_bar)
+def add_tweet_embeddings_to_graph(G: nx.Graph, embeddings_df: pd.DataFrame,
+                                  embedding_name: str = 'embedding'):
+    assert 'id' in embeddings_df
+    assert 'embedding' in embeddings_df
+
+    embeddings_dict = embeddings_df.set_index('id').to_dict()['embedding']
+    nx.set_node_attributes(G, embeddings_dict, embedding_name)
+    return G
+
+
+def calculate_hashtag_embeddings(G: nx.Graph, embedding_name: str = 'embedding', progress_bar=_dummy_progressbar):
     for node in progress_bar(G.nodes, total=len(G.nodes)):
         if G.nodes[node]["node_type"] == "hashtag":
             tweets = G.neighbors(node)
-            embeddings = np.asarray([G.node[tweet]["embedding"] for tweet in tweets])
-            G.node[node]["embedding"] = embeddings.mean(axis=0)
+            embeddings = np.asarray([G.node[tweet][embedding_name] for tweet in tweets])
+            G.node[node][embedding_name] = embeddings.mean(axis=0)
 
     for node in G.nodes:
-        assert "embedding" in G.node[node]
+        assert embedding_name in G.node[node]
 
     return G
 
 
-def calculate_edge_weights(G: nx.Graph, progress_bar=None):
-
-    progress_bar = _create_progress_bar(progress_bar)
+def calculate_edge_weights(G: nx.Graph,
+                           embedding_name: str = 'embedding',
+                           distance_name: str = 'distance',
+                           similarity_name: str = 'similarity',
+                           progress_bar=_dummy_progressbar):
 
     for node_from, node_to, edge_features in progress_bar(
         G.edges(data=True), total=len(G.edges)
     ):
-        emb_from = G.node[node_from]["embedding"]
-        emb_to = G.node[node_to]["embedding"]
+        emb_from = G.node[node_from][embedding_name]
+        emb_to = G.node[node_to][embedding_name]
 
         distance = scipy.spatial.distance.cosine(emb_from, emb_to)
         similarity = 1 - distance
         ang_dist = np.arccos(similarity) / np.pi
         ang_sim = 1 - ang_dist
 
-        edge_features["distance"] = ang_dist
-        edge_features["similarity"] = ang_sim
+        edge_features[distance_name] = ang_dist
+        edge_features[similarity_name] = ang_sim
 
-        return G
+    return G
 
 
 def calculate_pagerank(G: nx.Graph):
 
     graph_pagerank = nx.pagerank(G)
     nx.set_node_attributes(G, graph_pagerank, "pagerank")
+
+    return G
+
+
+def calculate_hashtag_popularity_mean_retweets_heuristic(G: nx.Graph, progress_bar=_dummy_progressbar):
+    for node in progress_bar(G.nodes, total=len(G.nodes)):
+        if G.nodes[node]["node_type"] == "hashtag":
+            tweets = G.neighbors(node)
+            retweets_counts = np.asarray([G.node[tweet]['retweets'] for tweet in tweets])
+            G.node[node]['mean_retweets'] = retweets_counts.mean(axis=0)
+
+    for node in G.nodes:
+        assert 'mean_retweets' in G.node[node] if G.node[node]['node_type'] == 'hashtag' else True
 
     return G
 
