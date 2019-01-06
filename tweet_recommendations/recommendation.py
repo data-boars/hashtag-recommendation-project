@@ -4,23 +4,24 @@ from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import functools
+import pandas as pd
 
 
 CONFIG_KEYS = ['K', 'w2v_function', 'embedding_name', 'popularity_measure', 'popularity_to_similarity_ratio']
 
 
-def embedding_similarity(x, y):
+def embedding_similarity(x: np.ndarray, y: np.ndarray):
     similarity = cosine_similarity(x, y)
     ang_dist = np.arccos(similarity) / np.pi
     ang_sim = 1 - ang_dist
     return ang_sim
 
 
-def normalise(array):
+def normalise(array: np.ndarray):
     return (array - array.min()) / (array.max() - array.min())
 
 
-def recommend_for_embedding(embedding, hashtags_df, config):
+def recommend_for_embedding(embedding: np.ndarray, hashtags_df: pd.DataFrame, config: dict):
     assert all(key in config for key in CONFIG_KEYS if key != 'w2v_function')
 
     embedding_name = config['embedding_name']
@@ -31,7 +32,8 @@ def recommend_for_embedding(embedding, hashtags_df, config):
     hashtag_embeddings = np.vstack(hashtags_df[embedding_name])
     similarities = embedding_similarity(embedding.reshape(1, -1), hashtag_embeddings).reshape(-1)
 
-    sim_pop_mix = prepare_similarity_and_popularity_mix(similarities, hashtags_df[popularity_measure].values,
+    sim_pop_mix = prepare_similarity_and_popularity_mix(similarities,
+                                                        hashtags_df[popularity_measure].values,
                                                         popularity_to_similarity_ratio, config)
 
     top_k = sim_pop_mix.argsort()[-K:][::-1]
@@ -39,7 +41,8 @@ def recommend_for_embedding(embedding, hashtags_df, config):
     return list(top_k)
 
 
-def prepare_similarity_and_popularity_mix(similarities, popularities, popularity_to_similarity_ratio, config):
+def prepare_similarity_and_popularity_mix(similarities: np.ndarray, popularities: np.ndarray,
+                                          popularity_to_similarity_ratio: float, config: dict):
     similarities = normalise(similarities)
     popularities = normalise(popularities)
 
@@ -50,7 +53,7 @@ def prepare_similarity_and_popularity_mix(similarities, popularities, popularity
     return sim_pop_mix
 
 
-def recommend_with_config(text, hashtags_df, config):
+def recommend_with_config(text: str, hashtags_df: pd.DataFrame, config: dict):
     if 'is_input_embedding' in config or config['is_input_embedding']:
         embedding = text
     else:
@@ -61,7 +64,7 @@ def recommend_with_config(text, hashtags_df, config):
     return recommend_for_embedding(embedding, hashtags_df, config)
 
 
-def prepare_base_config(w2v_model_path='/mnt/SAMSUNG/models/embeddings/kgr10.plain.skipgram.dim100.neg10.vec'):
+def prepare_base_config(w2v_model_path: str = '/mnt/SAMSUNG/models/embeddings/kgr10.plain.skipgram.dim100.neg10.vec'):
     conf = {'K': 10,
             'w2v_function': functools.partial(get_w2v_tweet_embedding,
                                               w2v_model=load_w2v_model(w2v_model_path)),
