@@ -6,7 +6,7 @@ from gensim.models import KeyedVectors
 
 
 def get_w2v_tweets_embeddings(
-    twitter_data: List[Tuple[str, List[str], str]]], w2v_model_path: str
+    twitter_data: List[Tuple[str, List[str], str]], w2v_model_path: str
 ) -> pd.DataFrame:
     id_list = []
     meaned_word_vector_list = []
