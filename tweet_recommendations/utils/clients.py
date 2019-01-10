@@ -4,7 +4,9 @@ import requests
 from bs4 import BeautifulSoup
 
 WCRFT2_ENDPOINT = "http://ws.clarin-pl.eu/nlprest2/base/process/"
-WCRFT2_JSON_TEMPLATE = {"lpmn": "any2txt|wcrft2", "text": "", "user": "sample@mail.com"}
+WCRFT2_JSON_TEMPLATE = {"lpmn": 'any2txt|morphoDita({"guesser":false, "allforms":false, "model":"XXI"})', 
+                        "text": "", 
+                        "user": "sample@mail.com"}
 
 
 def parse_wcrft_response(xml_response: str) -> List[str]:
