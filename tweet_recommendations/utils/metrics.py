@@ -3,7 +3,9 @@ from typing import Any, List
 import numpy as np
 
 
-def average_precision_at_k(ground_truth: List[Any], predicted: List[Any], k=5) -> float:
+def get_average_precision_at_k(
+    ground_truth: List[Any], predicted: List[Any], k=5
+) -> float:
     if len(predicted) > k:
         predicted = predicted[:k]
 
@@ -26,8 +28,23 @@ def get_mean_average_precision_at_k(
 ) -> float:
     return float(
         np.mean(
-            [average_precision_at_k(a, p, k) for a, p in zip(ground_truth, predicted)]
+            [
+                get_average_precision_at_k(a, p, k)
+                for a, p in zip(ground_truth, predicted)
+            ]
         )
+    )
+
+
+def get_recall_at_k(ground_truth: List[Any], predicted: List[Any], k=5) -> float:
+    if len(predicted) > k:
+        predicted = predicted[:k]
+    return len(set(ground_truth) & set(predicted)) / len(ground_truth)
+
+
+def get_mean_recall_at_k(ground_truth: List[Any], predicted: List[Any], k=5) -> float:
+    return float(
+        np.mean([get_recall_at_k(a, p, k) for a, p in zip(ground_truth, predicted)])
     )
 
 
