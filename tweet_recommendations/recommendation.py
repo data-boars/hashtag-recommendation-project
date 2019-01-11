@@ -54,7 +54,7 @@ def prepare_similarity_and_popularity_mix(similarities: np.ndarray, popularities
 
 
 def recommend_with_config(text: str, hashtags_df: pd.DataFrame, config: dict):
-    if 'is_input_embedding' in config or config['is_input_embedding']:
+    if 'is_input_embedding' in config and config['is_input_embedding']:
         embedding = text
     else:
         assert all(key in config for key in CONFIG_KEYS)
