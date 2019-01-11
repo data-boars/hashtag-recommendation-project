@@ -104,5 +104,7 @@ def get_rank_dcg_at_k(ground_truth: List[Any], predicted: List[Any], k=5) -> flo
             for index, pair in enumerate(sorted_hypothesis_pairs)
         ]
     )
+    if max_score - min_score == 0:
+        return 0.0
 
     return (eval_score - min_score) / (max_score - min_score)
