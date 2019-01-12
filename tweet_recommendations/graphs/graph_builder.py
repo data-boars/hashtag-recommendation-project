@@ -100,11 +100,11 @@ def calculate_hashtag_popularity_mean_retweets_heuristic(G: nx.Graph, progress_b
     for node in progress_bar(G.nodes, total=len(G.nodes)):
         if G.nodes[node]["node_type"] == "hashtag":
             tweets = G.neighbors(node)
-            retweets_counts = np.asarray([G.node[tweet]['retweets'] for tweet in tweets])
-            G.node[node]['mean_retweets'] = retweets_counts.mean(axis=0)
+            retweets_counts = np.asarray([G.nodes[tweet]['retweets'] for tweet in tweets])
+            G.nodes[node]['mean_retweets'] = retweets_counts.mean(axis=0)
 
     for node in G.nodes:
-        assert 'mean_retweets' in G.node[node] if G.node[node]['node_type'] == 'hashtag' else True
+        assert 'mean_retweets' in G.nodes[node] if G.nodes[node]['node_type'] == 'hashtag' else True
 
     return G
 
