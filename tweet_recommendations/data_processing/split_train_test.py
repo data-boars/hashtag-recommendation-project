@@ -4,7 +4,6 @@ from sklearn.model_selection import train_test_split
 
 
 def split_by_user(tweets_df: pd.DataFrame):
-
     assert "user" in tweets_df
 
     users = tweets_df.groupby("user").agg({"retweet_count": "mean"})
@@ -21,7 +20,7 @@ def split_by_user(tweets_df: pd.DataFrame):
         test_size=0.5,
         stratify=val_test_users["log_retweet_count"],
     )
-    
+
     return {
         "train": tweets_df[tweets_df["user"].isin(train_users)],
         "val": tweets_df[tweets_df["user"].isin(val_users)],
