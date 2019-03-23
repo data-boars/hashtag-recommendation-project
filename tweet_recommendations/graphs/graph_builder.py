@@ -5,7 +5,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy.spatial
-import tqdm
 
 from tweet_recommendations.data_processing.data_loader import (
     convert_hashtags_dicts_to_list
@@ -17,15 +16,14 @@ def _dummy_progressbar(iterable: Iterable, **kwargs):
 
 
 def build_base_tweets_graph(tweets_df: pd.DataFrame, progress_bar=_dummy_progressbar):
-
     assert "id" in tweets_df
     assert "hashtags" in tweets_df
     assert "retweet_count" in tweets_df
     assert tweets_df["hashtags"].apply(lambda x: isinstance(x, list)).all()
     assert (
         tweets_df["hashtags"]
-        .apply(lambda x: all(isinstance(elem, str) for elem in x))
-        .all()
+            .apply(lambda x: all(isinstance(elem, str) for elem in x))
+            .all()
     )
 
     G = nx.Graph()
@@ -70,9 +68,8 @@ def calculate_edge_weights(G: nx.Graph,
                            distance_name: str = 'distance',
                            similarity_name: str = 'similarity',
                            progress_bar=_dummy_progressbar):
-
     for node_from, node_to, edge_features in progress_bar(
-        G.edges(data=True), total=len(G.edges)
+            G.edges(data=True), total=len(G.edges)
     ):
         emb_from = G.node[node_from][embedding_name]
         emb_to = G.node[node_to][embedding_name]
@@ -89,7 +86,6 @@ def calculate_edge_weights(G: nx.Graph,
 
 
 def calculate_pagerank(G: nx.Graph):
-
     graph_pagerank = nx.pagerank(G)
     nx.set_node_attributes(G, graph_pagerank, "pagerank")
 
@@ -110,7 +106,6 @@ def calculate_hashtag_popularity_mean_retweets_heuristic(G: nx.Graph, progress_b
 
 
 def build_graph_pipeline(tweets_df, embeddings_df, progress_bar=None):
-
     assert "embedding" in embeddings_df
     assert "id" in embeddings_df
     assert "hashtags" in tweets_df
@@ -118,7 +113,7 @@ def build_graph_pipeline(tweets_df, embeddings_df, progress_bar=None):
 
     tweets_with_tags = tweets_df["hashtags"][tweets_df["hashtags"].str.len() > 0]
     if tweets_with_tags.apply(
-        lambda tags: all(isinstance(x, dict) for x in tags)
+            lambda tags: all(isinstance(x, dict) for x in tags)
     ).all():
         tweets_df = convert_hashtags_dicts_to_list(tweets_df)
 
