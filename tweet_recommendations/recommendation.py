@@ -1,9 +1,3 @@
-from tweet_recommendations.embeddings.word2vec import get_w2v_tweet_embedding, load_w2v_model
-from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-import functools
-import pandas as pd
 import functools
 
 import numpy as np
