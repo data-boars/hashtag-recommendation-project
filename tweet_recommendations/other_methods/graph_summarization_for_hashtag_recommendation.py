@@ -95,9 +95,8 @@ class GraphSummarizationMethod(Method):
         hashtags = [h['text'] for a_list in hashtags for h in a_list]
         counts = Counter(hashtags)
         filtered_tags = [t for t, count in counts.items() if count >= minimal_hashtag_occurrence]
-        data["hashtags"] = data["hashtags"].apply(
-            lambda x: x if all(elem['text'] in filtered_tags for elem in x) and len(x) > 0 else np.nan)
-        data = data.dropna(subset=["hashtags"])
+        data = data["hashtags"].apply(lambda x: [elem for elem in x if elem["text"] in filtered_tags])
+        data = data[data["hashtags"].str.len() > 0]
         return data
 
     def fit(self, x: pd.DataFrame, y=None, **fit_params) -> "Method":
@@ -190,7 +189,8 @@ class GraphSummarizationMethod(Method):
     def transform(self, x: Union[List[str], str]) -> List[str]:
         """
         For a given tweet represented as a list of lemmas recommends hashtags.
-        :param x: list of str. List containing lemmas of tweet.
+        :param x: list of str or str. If list is str, strs are lemmas of the tweet. If single str, it is assumed that
+            lemmatization has to be performed.
         :return: Iterable of recommended hashtags.
         """
         if isinstance(x, str):
