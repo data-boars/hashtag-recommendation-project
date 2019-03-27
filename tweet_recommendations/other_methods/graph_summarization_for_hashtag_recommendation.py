@@ -18,6 +18,16 @@ class GraphSummarizationMethod(Method):
                  damping_factor: float,
                  max_iterations: int,
                  verbose: bool = False):
+        """
+        Creates estimator for predicting hashtag based on graph construction
+        from https://sci-hub.tw/https://ieeexplore.ieee.org/document/7300890
+        :param minimal_random_walk_change_difference_value: float. Small value.
+            It is used for stop criterion in random walk. If difference between random walk values from previous
+            step and random walk values from current step is less than that value, then algorithm is stopped.
+        :param damping_factor: float. 0 <= damping_factor <= 1. Probability between random walk and restart.
+        :param max_iterations: int. max_iterations > 0. Maximal value of iterations to perform for random walk.
+        :param verbose: bool. Whether method should be talkative.
+        """
         self.graph: nx.Graph = None
 
         self._hashtags_tf_idf_vectorizer: TfidfVectorizer = None
