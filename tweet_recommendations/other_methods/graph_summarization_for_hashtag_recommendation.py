@@ -6,7 +6,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy.sparse as sps
-import scipy.sparse.linalg
 import tqdm
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -15,10 +14,12 @@ from .method import Method
 
 
 class GraphSummarizationMethod(Method):
-    def __init__(self):
+    def __init__(self, minimal_random_walk_change_difference_value: float,
+                 damping_factor: float,
+                 max_iterations: int,
+                 verbose: bool = False):
         self.graph: nx.Graph = None
 
-        self._similarity_rank_hashtags: np.ndarray = None
         self._hashtags_tf_idf_vectorizer: TfidfVectorizer = None
         self._hashtags_tf_idf_representation: np.ndarray = None
 
@@ -26,7 +27,12 @@ class GraphSummarizationMethod(Method):
         self._users_labels: Union[set, np.ndarray] = None
         self._tweet_labels: Union[set, np.ndarray] = None
 
-        self._tags_values: np.ndarray = None
+        self._transition_matrix: np.ndarray = None
+
+        self.minimal_random_walk_change_difference_value = minimal_random_walk_change_difference_value
+        self.damping_factor = damping_factor
+        self.max_iterations = max_iterations
+        self.verbose = verbose
 
     def _transform_single_row(self, hashtag_agg: Dict, row: pd.Series):
         """
@@ -95,7 +101,7 @@ class GraphSummarizationMethod(Method):
         hashtags = [h['text'] for a_list in hashtags for h in a_list]
         counts = Counter(hashtags)
         filtered_tags = [t for t, count in counts.items() if count >= minimal_hashtag_occurrence]
-        data = data["hashtags"].apply(lambda x: [elem for elem in x if elem["text"] in filtered_tags])
+        data["hashtags"] = data["hashtags"].apply(lambda x: [elem for elem in x if elem["text"] in filtered_tags])
         data = data[data["hashtags"].str.len() > 0]
         return data
 
@@ -106,19 +112,12 @@ class GraphSummarizationMethod(Method):
             case.
         :param y: None, needed for compatibility.
         :param fit_params:
-            iterations: int. Number of iterations to perform on random walk.
-            damping_factor: float. Value for random walk with restart 0 <= damping_factor <= 1.
             minimal_hashtag_occurrence: int. If hashtag occurred less than this number then it's not considered during
                 prediction (simply removed). To include all hashtags put number <= 0.
-            verbose: bool. If verbose then prints all the information.
         :return: self.
         """
         self.graph = nx.Graph()
-
-        iterations = fit_params["iterations"]
-        damping_factor = fit_params["damping_factor"]
         minimal_hashtag_occurence = fit_params["minimal_hashtag_occurence"]
-        verbose = fit_params.get("verbose", False)
 
         x = self._drop_hashtag_that_occurred_less_than(x, minimal_hashtag_occurence)
 
@@ -128,60 +127,41 @@ class GraphSummarizationMethod(Method):
         self._users_labels = set()
         self._tweet_labels = set()
 
-        if verbose:
+        if self.verbose:
             print("Building graph ...")
             tqdm.tqdm.pandas()
             x.progress_apply(lambda r: self._transform_single_row(hashtag_agg, r), axis=1)
         else:
             x.apply(lambda r: self._transform_single_row(hashtag_agg, r), axis=1)
 
-        self._refine_matrix_with_additional_connections(verbose)
+        self._refine_matrix_with_additional_connections(self.verbose)
 
         self._hashtag_labels = np.asarray(list(self._hashtag_labels))
         self._users_labels = np.asarray(list(self._users_labels))
         self._tweet_labels = np.asarray(list(self._tweet_labels))
 
-        if verbose:
+        if self.verbose:
             print("Building incidence matrix ...")
         incidence_matrix = self._get_binary_incidence_matrix()[:len(self._hashtag_labels), len(self._hashtag_labels):]
         weighted_adjacency_matrix_of_tags = incidence_matrix.dot(incidence_matrix.T)
         weighted_adjacency_matrix_of_tags.setdiag(0)
 
-        if verbose:
+        if self.verbose:
             print("Building hashtag graph ...")
 
         hashtag_graph = nx.from_scipy_sparse_matrix(weighted_adjacency_matrix_of_tags)
 
-        weighted_degree = list(map(itemgetter(1), hashtag_graph.degree(weight="weight")))
-        matrix_weighted_degree = sps.diags([weighted_degree], [0])
+        weighted_degree = np.asarray(list(map(itemgetter(1), hashtag_graph.degree(weight="weight"))))
+        matrix_weighted_degree = sps.diags([1 / (weighted_degree + 1e-8)], [0])
+        self._transition_matrix = weighted_adjacency_matrix_of_tags.dot(matrix_weighted_degree)
 
-        # add Marguardt-Levenberg coefficient because of singular factor which causes error while calculating inversion
-        matrix_weighted_degree += sps.eye(len(weighted_degree)) * 1e-4
-        transition_matrix = weighted_adjacency_matrix_of_tags.dot(sps.linalg.inv(matrix_weighted_degree))
-        preference_vectors = sps.eye(len(self._hashtag_labels)).T
-
-        similarity_rank_vertices = preference_vectors
-
-        if verbose:
-            print("Optimizing random walk ...")
-
-        for iteration in range(iterations):
-            if verbose:
-                print("Step: {}/{}".format(iteration + 1, iterations))
-            similarity_rank_vertices = damping_factor * transition_matrix.dot(similarity_rank_vertices) + (
-                    1 - damping_factor) * preference_vectors
-
-        self._similarity_rank_hashtags = similarity_rank_vertices
-        self._tags_values = similarity_rank_vertices.dot(similarity_rank_vertices.T).diagonal()
-        self._tags_values /= self._tags_values.sum()
-
-        if verbose:
+        if self.verbose:
             print("Calculating tf idf ...")
 
         document_list = [' '.join(hashtag_agg[key]) for key in self._hashtag_labels]
 
         # it has normalization inside, so no L2 is necessary
-        self._hashtags_tf_idf_vectorizer = TfidfVectorizer()
+        self._hashtags_tf_idf_vectorizer = TfidfVectorizer(norm="l2")
         self._hashtags_tf_idf_representation = self._hashtags_tf_idf_vectorizer.fit_transform(document_list)
 
         return self
@@ -203,7 +183,40 @@ class GraphSummarizationMethod(Method):
 
         # ... so this simplifies to cosine similarity
         similarities = self._hashtags_tf_idf_representation.dot(tf_idf_vector.T).toarray()[:, 0]
-        best_indices = np.argsort(-similarities * self._tags_values)
+        query_hashtag_index = np.argmax(similarities)
+
+        preference_vector = np.zeros((len(self._hashtag_labels, )))[..., np.newaxis]
+        preference_vector[query_hashtag_index] = 1
+        preference_vector = sps.csr_matrix(preference_vector, shape=preference_vector.shape, dtype=np.float32)
+
+        similarity_rank_vertices = preference_vector
+        previous_similarity_rank_vertices: np.ndarray = preference_vector
+        nb_iteration = 0
+
+        while True:
+            if self.verbose:
+                print("Step: {}".format(nb_iteration + 1))
+
+            similarity_rank_vertices = self.damping_factor * self._transition_matrix.dot(similarity_rank_vertices) + (
+                    1 - self.damping_factor) * preference_vector
+
+            diff = np.abs(np.sum(similarity_rank_vertices - previous_similarity_rank_vertices))
+            if nb_iteration > 0 and diff < self.minimal_random_walk_change_difference_value:
+                if self.verbose:
+                    print("Converged with error: {:.6f}".format(diff))
+                break
+
+            previous_similarity_rank_vertices = similarity_rank_vertices
+            nb_iteration += 1
+
+            if nb_iteration > self.max_iterations:
+                if self.verbose:
+                    print("Random walk did not converged, current error: {:.6f}".format(diff))
+                break
+
+        similarity_rank_vertices = np.squeeze(similarity_rank_vertices.toarray())
+
+        best_indices = np.argsort(-similarities * similarity_rank_vertices)
         result = self._hashtag_labels[best_indices].tolist()
         return self.post_process_result(result)
 
