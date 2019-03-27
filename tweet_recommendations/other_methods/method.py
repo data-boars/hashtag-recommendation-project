@@ -1,10 +1,10 @@
 from typing import *
 
 import pandas as pd
-from sklearn.base import TransformerMixin
+from sklearn.base import TransformerMixin, BaseEstimator
 
 
-class Method(TransformerMixin):
+class Method(TransformerMixin, BaseEstimator):
     def fit(self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params) -> "Method":
         raise NotImplementedError
 
