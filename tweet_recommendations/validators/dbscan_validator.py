@@ -1,11 +1,14 @@
 import pickle as pkl
 
-from tweet_recommendations.other_methods.graph_summarization_for_hashtag_recommendation import GraphSummarizationEstimator
 from tweet_recommendations.other_methods.lemmatizer import TaggerToygerLemmatizer
+from tweet_recommendations.other_methods.dbscan_based_method import DBScanBasedEstimator
+from tweet_recommendations.embeddings.models import FastText
+from functools import partial
+
+fast_text = partial(FastText(), fasttext_model=None)
 
 lemmatizer = TaggerToygerLemmatizer("data/processed/lemmas.p")
-the_graph = GraphSummarizationEstimator(max_iterations=100, minimal_random_walk_change_difference_value=1e-1,
-                                        verbose=True, damping_factor=0.8)
+the_graph = DBScanBasedEstimator()
 
 with open("data/source_data/original_tweets.p", "rb") as f:
     original_tweets = pkl.load(f)

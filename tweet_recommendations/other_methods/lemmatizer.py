@@ -1,10 +1,11 @@
 import os
 
 import pandas as pd
-from sklearn.base import TransformerMixin, BaseEstimator
+
+from tweet_recommendations.estimator import Estimator
 
 
-class TaggerToygerLemmatizer(TransformerMixin, BaseEstimator):
+class TaggerToygerLemmatizer(Estimator):
     def __init__(self, path: str, verbose: bool = False):
         """
         Creates lemmatizer based on Tagger Toyger tool

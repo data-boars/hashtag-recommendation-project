@@ -1,4 +1,4 @@
-from collections import defaultdict, Counter
+from collections import defaultdict
 from operator import itemgetter
 from typing import *
 
@@ -10,11 +10,12 @@ import tqdm
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
-from .method import Method
+from estimator import Estimator
 
 
-class GraphSummarizationMethod(Method):
-    def __init__(self, minimal_random_walk_change_difference_value: float,
+class GraphSummarizationEstimator(Estimator):
+    def __init__(self,
+                 minimal_random_walk_change_difference_value: float,
                  damping_factor: float,
                  max_iterations: int,
                  verbose: bool = False):
@@ -105,17 +106,7 @@ class GraphSummarizationMethod(Method):
 
         return incidence_matrix
 
-    def _drop_hashtag_that_occurred_less_than(self, data: pd.DataFrame,
-                                              minimal_hashtag_occurrence: int) -> pd.DataFrame:
-        hashtags = data["hashtags"].tolist()
-        hashtags = [h['text'] for a_list in hashtags for h in a_list]
-        counts = Counter(hashtags)
-        filtered_tags = [t for t, count in counts.items() if count >= minimal_hashtag_occurrence]
-        data["hashtags"] = data["hashtags"].apply(lambda x: [elem for elem in x if elem["text"] in filtered_tags])
-        data = data[data["hashtags"].str.len() > 0]
-        return data
-
-    def fit(self, x: pd.DataFrame, y=None, **fit_params) -> "Method":
+    def fit(self, x: pd.DataFrame, y=None, **fit_params) -> "Estimator":
         """
         Builds tri partite graph of Users - Hashtags - Tweets. Hashtags are connected if has the same user.
         :param x: pd.DataFrame with tweet content, user id, and separate hashtags. It is "original_tweets.p" in our
@@ -129,7 +120,7 @@ class GraphSummarizationMethod(Method):
         self.graph = nx.Graph()
         minimal_hashtag_occurence = fit_params["minimal_hashtag_occurence"]
 
-        x = self._drop_hashtag_that_occurred_less_than(x, minimal_hashtag_occurence)
+        x = self.drop_hashtag_that_occurred_less_than(x, minimal_hashtag_occurence)
 
         hashtag_agg = defaultdict(list)
 
