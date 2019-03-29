@@ -93,8 +93,9 @@ class GraphSummarizationMethod(Method):
                 for neighbour in self.graph.neighbors(node):
                     if self.graph.node[neighbour]["type"] == "username":
                         for other_node in self.graph.neighbors(neighbour):
-                            if self.graph.node[other_node]["type"] == "hashtag" and not self.graph.has_edge(node,
-                                                                                                            other_node):
+                            if self.graph.node[other_node]["type"] == "hashtag" \
+                                    and not self.graph.has_edge(node, other_node) \
+                                    and not node == other_node:
                                 new_graph.add_edge(node, other_node)
         self.graph = new_graph
 
@@ -191,44 +192,50 @@ class GraphSummarizationMethod(Method):
         # as in fit, vectorizer has normalization inside ...
         tf_idf_vector = self._hashtags_tf_idf_vectorizer.transform([x])
 
-        # ... so this simplifies to cosine similarity
-        similarities = self._hashtags_tf_idf_representation.dot(tf_idf_vector.T).toarray()[:, 0]
-        query_hashtag_index = np.argmax(similarities)
+        # ... so this simplifies to cosine similarity - no normalisation required
+        similarities = np.squeeze(self._hashtags_tf_idf_representation.dot(tf_idf_vector.T).toarray())
+        similarity_rank_vertices = self._random_walk(similarities)
 
+        best_indices = np.argsort(-similarities * similarity_rank_vertices)
+        result = self._hashtag_labels[best_indices].tolist()
+        return self.post_process_result(result)
+
+    def _random_walk(self, similarities: np.ndarray) -> np.ndarray:
+        """
+        Performs random walk algorithm on graph using transition matrix calculated in `fit`, given similarities of input
+        tweet to hashtags representations calculated as tf idf in `fit` method. Random walk lasts until no changes are
+        noticed in node values or algorithm exceeded upper limit of possible iterations.
+        :param similarities: Vector of shape N x 1, where N is total number of hashtags used during fit.
+        :return: Vector of length N, where each element consists probability of going from node representing
+            hashtag in `preference_vector` to other nodes. The higher probability, the better hashtag.
+        """
+        query_hashtag_index = np.argmax(similarities)
         preference_vector = np.zeros((len(self._hashtag_labels, )))[..., np.newaxis]
         preference_vector[query_hashtag_index] = 1
         preference_vector = sps.csr_matrix(preference_vector, shape=preference_vector.shape, dtype=np.float32)
-
         similarity_rank_vertices = preference_vector
-        previous_similarity_rank_vertices: np.ndarray = preference_vector
         nb_iteration = 0
-
         while True:
+            previous_similarity_rank_vertices = similarity_rank_vertices
             if self.verbose:
                 print("Step: {}".format(nb_iteration + 1))
 
             similarity_rank_vertices = self.damping_factor * self._transition_matrix.dot(similarity_rank_vertices) + (
                     1 - self.damping_factor) * preference_vector
 
-            diff = np.abs(np.sum(similarity_rank_vertices - previous_similarity_rank_vertices))
+            diff = np.sum(np.abs(similarity_rank_vertices - previous_similarity_rank_vertices))
             if nb_iteration > 0 and diff < self.minimal_random_walk_change_difference_value:
                 if self.verbose:
                     print("Converged with error: {:.6f}".format(diff))
                 break
 
-            previous_similarity_rank_vertices = similarity_rank_vertices
             nb_iteration += 1
 
             if nb_iteration > self.max_iterations:
                 if self.verbose:
-                    print("Random walk did not converged, current error: {:.6f}".format(diff))
+                    print("Random walk did not converge, current error: {:.6f}".format(diff))
                 break
-
-        similarity_rank_vertices = np.squeeze(similarity_rank_vertices.toarray())
-
-        best_indices = np.argsort(-similarities * similarity_rank_vertices)
-        result = self._hashtag_labels[best_indices].tolist()
-        return self.post_process_result(result)
+        return np.squeeze(similarity_rank_vertices.toarray())
 
     def post_process_result(self, result: List[str]):
         """
