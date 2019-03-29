@@ -205,7 +205,7 @@ class GraphSummarizationMethod(Method):
         Performs random walk algorithm on graph using transition matrix calculated in `fit`, given similarities of input
         tweet to hashtags representations calculated as tf idf in `fit` method. Random walk lasts until no changes are
         noticed in node values or algorithm exceeded upper limit of possible iterations.
-        :param similarities: Vector of shape N, where N is total number of hashtags used during fit.
+        :param similarities: Vector of length N, where N is total number of hashtags used during fit.
         :return: Vector of length N, where each element consists probability of going from node representing
             hashtag in `preference_vector` to other nodes. The higher probability, the better hashtag.
         """
