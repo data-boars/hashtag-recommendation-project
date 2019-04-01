@@ -11,6 +11,13 @@ CONFIG_KEYS = ['K', 'w2v_function', 'embedding_name', 'popularity_measure', 'pop
 
 
 def embedding_similarity(x: np.ndarray, y: np.ndarray):
+    """
+    Computes angular similarity based on cosine similarity. 
+    https://en.wikipedia.org/wiki/Cosine_similarity#Angular_distance_and_similarity
+    Angular similarity is bound to [0, 1] and angular distance is a formal distance metric.
+    """
+    
+    # clipping to avoid computational errors
     similarity = np.clip(cosine_similarity(x, y), -1, 1)
     ang_dist = np.arccos(similarity) / np.pi
     ang_sim = 1 - ang_dist
@@ -18,10 +25,9 @@ def embedding_similarity(x: np.ndarray, y: np.ndarray):
 
 
 def normalise(array: np.ndarray):
-    if array.max() != array.min():
+    if not np.isclose(array.max(), array.min(), rtol=1e-8):
         return (array - array.min()) / (array.max() - array.min())
-    else:
-        return array
+    return array
 
 
 def recommend_for_embedding(embedding: np.ndarray, hashtags_df: pd.DataFrame, config: dict):
@@ -39,7 +45,8 @@ def recommend_for_embedding(embedding: np.ndarray, hashtags_df: pd.DataFrame, co
 
 
 def recommend_with_computed_similarities(similarities: np.ndarray, hashtags_df: pd.DataFrame, config: dict):
-    assert all(key in config for key in CONFIG_KEYS if key != 'w2v_function')
+    # w2v_function is no longer required in config, when we have precomputed embedding similarities
+    assert all(key in config for key in CONFIG_KEYS if key != 'w2v_function'), 
 
     popularity_measure = config['popularity_measure']
     popularity_to_similarity_ratio = config['popularity_to_similarity_ratio']
