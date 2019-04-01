@@ -2,6 +2,8 @@ import random
 
 import numpy as np
 import pandas as pd
+import os
+import pickle
 
 from tweet_recommendations.utils.metrics import (
     get_rank_dcg_at_k,
@@ -38,7 +40,7 @@ def get_map_value_for_tweets(
             lambda row: get_metrices_for_given_dataset(
                 config, hashtag_data, row, recommendation_function
             ),
-            axis=1,
+            axis=1
         ).tolist()
     )
     return (
@@ -49,7 +51,7 @@ def get_map_value_for_tweets(
 
 
 def get_metrices_for_given_dataset(config, hashtag_data, row, recommendation_function):
-    predicted_hashtag_rank = recommendation_function(row["tweet"], hashtag_data, config)
+    predicted_hashtag_rank = recommendation_function(row["text"], hashtag_data, config)
     expected_hashtags = row["expected_hashtags"]
     return (
         get_recall_at_k(expected_hashtags, predicted_hashtag_rank, config["K"]),
