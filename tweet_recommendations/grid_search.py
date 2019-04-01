@@ -97,8 +97,7 @@ def grid_search(datasets_pool, hashtags_df, hyperparameters_df, metrics_to_calc=
     if backup_dir is not None:
         os.makedirs(backup_dir, exist_ok=True)
 
-    bag = db.from_sequence([hyperparameters_df.iloc[i].to_dict()
-                            for i in range(len(hyperparameters_df))])
+    bag = db.from_sequence(hyperparameters_df.to_dict('records'))
 
     if 'count' not in hashtags_df:
         hashtags_df = add_hashtag_occurences_counts(hashtags_df, datasets_pool['train'])
