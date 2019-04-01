@@ -5,9 +5,8 @@ import pandas as pd
 import preprocessor as p
 
 
-def load_dataset_as_dataframe_with_given_fields(
-    path: str, fields=("hashtags", "text", "retweet_count", "id")
-) -> pd.DataFrame:
+def load_dataset_as_dataframe_with_given_fields(path: str,
+                                                fields=("hashtags", "text", "retweet_count", "id")) -> pd.DataFrame:
     tweets_df = pd.read_pickle(path)
     dataset = pd.DataFrame(tweets_df)[fields]
     return dataset
@@ -28,9 +27,7 @@ def extract_hashtags(list_of_dicts: List[Dict]) -> List[str]:
     return list(set(output_hashtags))
 
 
-def tokenize_tweet_content_to_types(
-    dataset: pd.DataFrame, tokenize_type_list: List[str]
-) -> pd.DataFrame:
+def tokenize_tweet_content_to_types(dataset: pd.DataFrame, tokenize_type_list: List[str]) -> pd.DataFrame:
     """Tokenize all tweets with with defined contents i.e 'something #DataScience' with 'something $HASHTAG$' """
     tuple_to_unpack = get_filter_objects_as_tuple(tokenize_type_list)
     p.set_options(*tuple_to_unpack)
@@ -38,9 +35,7 @@ def tokenize_tweet_content_to_types(
     return dataset
 
 
-def get_cleared_dataset_without_specific_content(
-    dataset: pd.DataFrame, clearing_type_list: List[str]
-) -> pd.DataFrame:
+def get_cleared_dataset_without_specific_content(dataset: pd.DataFrame, clearing_type_list: List[str]) -> pd.DataFrame:
     dataset["hashtags"] = dataset["hashtags"].apply(lambda txt: extract_hashtags(txt))
     tuple_to_unpack = get_filter_objects_as_tuple(clearing_type_list)
     p.set_options(*tuple_to_unpack)
@@ -76,9 +71,7 @@ def load_toyger_data(path: str) -> List[Tuple[str, List[str], str]]:
     return valid_data
 
 
-def save_tweet_averge_word_embedding(
-    dataframe: pd.DataFrame, path_to_save_embeddings: str
-):
+def save_tweet_averge_word_embedding(dataframe: pd.DataFrame, path_to_save_embeddings: str):
     with open(path_to_save_embeddings, "wb") as f:
         pickle.dump(dataframe, f)
 

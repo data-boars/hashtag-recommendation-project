@@ -1,7 +1,7 @@
 import random
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import os
 import pickle
 
@@ -25,17 +25,15 @@ def get_k_random_hashtags_from_hashtag_data(hashtag_data: pd.DataFrame, k=10):
     return hashtag_list
 
 
-def get_hashtag_rank_for_given_tweets(
-    tweet: str, hashtag_data: pd.DataFrame, config: dict
-):
+def get_hashtag_rank_for_given_tweets(tweet: str, hashtag_data: pd.DataFrame, config: dict):
     return get_k_random_hashtags_from_hashtag_data(hashtag_data, config["K"])
 
 
 def get_map_value_for_tweets(
-    test_set: pd.DataFrame,
-    config: dict,
-    hashtag_data=None,
-    recommendation_function=get_hashtag_rank_for_given_tweets,
+        test_set: pd.DataFrame,
+        config: dict,
+        hashtag_data=None,
+        recommendation_function=get_hashtag_rank_for_given_tweets,
 ):
     test_recall, test_mAP, test_ndcg = zip(
         *test_set.apply(
