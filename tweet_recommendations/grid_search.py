@@ -78,8 +78,6 @@ def experiment(tweets_df, hashtags_df, hyperparameters, metrics_to_calculate=MET
                        axis=1)
     result = pd.DataFrame(list(metrics)).mean()
 
-    del df, hashtags, precomputed_similarities
-
     if backup_dir is not None:
         bak = {col: result[col] for col in result.index}
         fname = '_'.join([str(x) for x in hyperparameters.values()]) + '.pkl'
