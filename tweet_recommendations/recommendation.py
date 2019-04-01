@@ -1,11 +1,11 @@
-from tweet_recommendations.embeddings.fast_text import get_fasttext_tweet_embedding, load_fasttext_model
+import functools
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
+
 from tweet_recommendations.embeddings.word2vec import get_w2v_tweet_embedding, load_w2v_model
 from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-import functools
-import pandas as pd
-
 
 CONFIG_KEYS = ['K', 'w2v_function', 'embedding_name', 'popularity_measure', 'popularity_to_similarity_ratio']
 

@@ -5,11 +5,8 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy.spatial
-import tqdm
 
-from tweet_recommendations.data_processing.data_loader import (
-    convert_hashtags_dicts_to_list
-)
+from tweet_recommendations.data_processing.data_loader import convert_hashtags_dicts_to_list
 
 
 def _dummy_progressbar(iterable: Iterable, **kwargs):
@@ -22,11 +19,10 @@ def build_base_tweets_graph(tweets_df: pd.DataFrame, progress_bar=_dummy_progres
     assert "hashtags" in tweets_df, "Column 'hashtags' not present in tweets_df"
     assert "retweet_count" in tweets_df, "Column 'retweet_count' not present in tweets_df"
     assert tweets_df["hashtags"].apply(lambda x: isinstance(x, list)).all(), "Column 'hashtags' doesn't contain lists"
-    assert (
-        tweets_df["hashtags"]
-        .apply(lambda x: all(isinstance(elem, str) for elem in x))
-        .all()
-    ), "Not all elements of 'hashtags' lists are strings"
+    assert (tweets_df["hashtags"]
+            .apply(lambda x: all(isinstance(elem, str) for elem in x))
+            .all()
+           ), "Not all elements of 'hashtags' lists are strings"
 
     G = nx.Graph()
     for row in progress_bar(tweets_df.itertuples(), total=len(tweets_df)):
@@ -70,10 +66,7 @@ def calculate_edge_weights(G: nx.Graph,
                            distance_name: str = 'distance',
                            similarity_name: str = 'similarity',
                            progress_bar=_dummy_progressbar):
-
-    for node_from, node_to, edge_features in progress_bar(
-        G.edges(data=True), total=len(G.edges)
-    ):
+    for node_from, node_to, edge_features in progress_bar(G.edges(data=True), total=len(G.edges)):
         emb_from = G.node[node_from][embedding_name]
         emb_to = G.node[node_to][embedding_name]
 
@@ -89,7 +82,6 @@ def calculate_edge_weights(G: nx.Graph,
 
 
 def calculate_pagerank(G: nx.Graph):
-
     graph_pagerank = nx.pagerank(G)
     nx.set_node_attributes(G, graph_pagerank, "pagerank")
 
@@ -118,9 +110,7 @@ def build_graph_pipeline(tweets_df, embeddings_df, progress_bar=None):
     assert "id" in tweets_df, "Column 'id' not present in tweets_df"
 
     tweets_with_tags = tweets_df["hashtags"][tweets_df["hashtags"].str.len() > 0]
-    if tweets_with_tags.apply(
-        lambda tags: all(isinstance(x, dict) for x in tags)
-    ).all():
+    if tweets_with_tags.apply(lambda tags: all(isinstance(x, dict) for x in tags)).all():
         tweets_df = convert_hashtags_dicts_to_list(tweets_df)
 
     df = tweets_df.merge(embeddings_df, on="id")
@@ -134,9 +124,7 @@ def build_graph_pipeline(tweets_df, embeddings_df, progress_bar=None):
 
 if __name__ == "__main__":
     tweets_df = pd.read_pickle("../../data/source_data/original_tweets.p")
-    tweets_df["hashtags"] = tweets_df["hashtags"].apply(
-        lambda x: [item["text"] for item in x]
-    )
+    tweets_df["hashtags"] = tweets_df["hashtags"].apply(lambda x: [item["text"] for item in x])
     embeddings_df = pd.read_pickle("../../data/embeddings/embeddings.pkl")
     embeddings_df["tweet_id"] = embeddings_df["tweet_id"].astype(np.int64)
     embeddings_df = embeddings_df.rename({"embeddings": "embedding"}, axis="columns")
