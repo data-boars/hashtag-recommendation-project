@@ -14,11 +14,15 @@ def _dummy_progressbar(iterable: Iterable, **kwargs):
 
 
 def build_base_tweets_graph(tweets_df: pd.DataFrame, progress_bar=_dummy_progressbar):
-    assert "id" in tweets_df
-    assert "hashtags" in tweets_df
-    assert "retweet_count" in tweets_df
-    assert tweets_df["hashtags"].apply(lambda x: isinstance(x, list)).all()
-    assert tweets_df["hashtags"].apply(lambda x: all(isinstance(elem, str) for elem in x)).all()
+
+    assert "id" in tweets_df, "Column 'id' not present in tweets_df"
+    assert "hashtags" in tweets_df, "Column 'hashtags' not present in tweets_df"
+    assert "retweet_count" in tweets_df, "Column 'retweet_count' not present in tweets_df"
+    assert tweets_df["hashtags"].apply(lambda x: isinstance(x, list)).all(), "Column 'hashtags' doesn't contain lists"
+    assert (tweets_df["hashtags"]
+            .apply(lambda x: all(isinstance(elem, str) for elem in x))
+            .all()
+           ), "Not all elements of 'hashtags' lists are strings"
 
     G = nx.Graph()
     for row in progress_bar(tweets_df.itertuples(), total=len(tweets_df)):
@@ -36,8 +40,8 @@ def build_base_tweets_graph(tweets_df: pd.DataFrame, progress_bar=_dummy_progres
 
 def add_tweet_embeddings_to_graph(G: nx.Graph, embeddings_df: pd.DataFrame,
                                   embedding_name: str = 'embedding'):
-    assert 'id' in embeddings_df
-    assert 'embedding' in embeddings_df
+    assert 'id' in embeddings_df, "Column 'id' not present in embeddings_df"
+    assert 'embedding' in embeddings_df, "Column 'embedding' not present in embeddings_df"
 
     embeddings_dict = embeddings_df.set_index('id').to_dict()['embedding']
     nx.set_node_attributes(G, embeddings_dict, embedding_name)
@@ -52,7 +56,7 @@ def calculate_hashtag_embeddings(G: nx.Graph, embedding_name: str = 'embedding',
             G.node[node][embedding_name] = embeddings.mean(axis=0)
 
     for node in G.nodes:
-        assert embedding_name in G.node[node]
+        assert embedding_name in G.node[node], f"Node '{node}' doesn't have an attribute: 'embedding name'"
 
     return G
 
@@ -88,20 +92,22 @@ def calculate_hashtag_popularity_mean_retweets_heuristic(G: nx.Graph, progress_b
     for node in progress_bar(G.nodes, total=len(G.nodes)):
         if G.nodes[node]["node_type"] == "hashtag":
             tweets = G.neighbors(node)
-            retweets_counts = np.asarray([G.node[tweet]['retweets'] for tweet in tweets])
-            G.node[node]['mean_retweets'] = retweets_counts.mean(axis=0)
+            retweets_counts = np.asarray([G.nodes[tweet]['retweets'] for tweet in tweets])
+            G.nodes[node]['mean_retweets'] = retweets_counts.mean(axis=0)
 
     for node in G.nodes:
-        assert 'mean_retweets' in G.node[node] if G.node[node]['node_type'] == 'hashtag' else True
+        assert 'mean_retweets' in G.nodes[node] if G.nodes[node]['node_type'] == 'hashtag' else True,\
+        f"Node '{node}' doesn't have an attribute: 'mean_retweets'"
 
     return G
 
 
 def build_graph_pipeline(tweets_df, embeddings_df, progress_bar=None):
-    assert "embedding" in embeddings_df
-    assert "id" in embeddings_df
-    assert "hashtags" in tweets_df
-    assert "id" in tweets_df
+
+    assert "embedding" in embeddings_df, "Column 'embedding' not present in embeddings_df"
+    assert "id" in embeddings_df, "Column 'id' not present in embeddings_df"
+    assert "hashtags" in tweets_df, "Column 'hashtags' not present in tweets_df"
+    assert "id" in tweets_df, "Column 'id' not present in tweets_df"
 
     tweets_with_tags = tweets_df["hashtags"][tweets_df["hashtags"].str.len() > 0]
     if tweets_with_tags.apply(lambda tags: all(isinstance(x, dict) for x in tags)).all():
