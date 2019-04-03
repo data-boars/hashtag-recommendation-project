@@ -6,7 +6,8 @@ import tqdm
 from sklearn.cluster import DBSCAN
 from sklearn.metrics.pairwise import paired_manhattan_distances
 
-from estimator import Estimator
+from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
+from ..estimator import Estimator
 
 
 class DBScanBasedEstimator(Estimator):
@@ -22,7 +23,7 @@ class DBScanBasedEstimator(Estimator):
 
         self.verbose = verbose
 
-    def fit(self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params) -> "Estimator":
+    def fit(self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params):
         """
         Builds hashtags representations using w2v method and clusters them using DBScan.
         :param x: pd.DataFrame with tweet content, user id, and separate hashtags. It is "original_tweets.p" in our
@@ -40,9 +41,9 @@ class DBScanBasedEstimator(Estimator):
         if self.verbose:
             print("Creating embeddings ...")
             tqdm.tqdm.pandas()
-            x["embedding"] = x.progress_apply(lambda r: np.mean(self.vectorizing_model.transform(r["lemmas"])))
+            x["embedding"] = x.progress_apply(lambda r: self.vectorizing_model.transform(r["lemmas"]))
         else:
-            x["embedding"] = x.apply(lambda r: np.mean(self.vectorizing_model.transform(r["lemmas"])))
+            x["embedding"] = x.apply(lambda r: self.vectorizing_model.transform(r["lemmas"]))
 
         x["hashtags"] = x["hashtags"].apply(lambda r: [elem["text"] for elem in r["hashtags"]])
         x["embedding_labels"] = self.clusterizer.fit_predict(x["embedding"])
@@ -55,7 +56,17 @@ class DBScanBasedEstimator(Estimator):
             .drop("variable", axis=1) \
             .dropna()
 
+        return self
 
-
-    def transform(self, x: List[str]) -> List[str]:
+    def transform(self, x: List[str]):
+        """
+        For a given tweet represented as a list of lemmas recommends hashtags.
+        :param x: list of str or str. If list is str, strs are lemmas of the tweet. If single str, it is assumed that
+            lemmatization has to be performed.
+        :return: Iterable of recommended hashtags.
+        """
+        if isinstance(x, str):
+            x = get_wcrft2_results_for_text(x)
+        if isinstance(x, list):
+            x = ' '.join(x)
         pass
