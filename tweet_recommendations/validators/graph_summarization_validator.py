@@ -1,10 +1,10 @@
 import pickle as pkl
 
-from tweet_recommendations.other_methods.graph_summarization_for_hashtag_recommendation import GraphSummarizationMethod
+from tweet_recommendations.other_methods.graph_summarization_for_hashtag_recommendation import GraphSummarizationEstimator
 from tweet_recommendations.other_methods.lemmatizer import TaggerToygerLemmatizer
 
 lemmatizer = TaggerToygerLemmatizer("data/processed/lemmas.p")
-the_graph = GraphSummarizationMethod(max_iterations=100, minimal_random_walk_change_difference_value=1e-4,
+the_graph = GraphSummarizationEstimator(max_iterations=100, minimal_random_walk_change_difference_value=1e-4,
                                      verbose=True, damping_factor=0.8)
 
 with open("data/source_data/original_tweets.p", "rb") as f:
