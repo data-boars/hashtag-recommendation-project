@@ -3,11 +3,12 @@ from itertools import chain
 
 import pandas as pd
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Union
 from sklearn.decomposition import TruncatedSVD
 
 from tweet_recommendations.embeddings.word2vec import load_w2v_model
 from tweet_recommendations.estimator import Estimator
+from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 
 
 class SIFEmbedding(Estimator):
@@ -34,7 +35,7 @@ class SIFEmbedding(Estimator):
         word_counts = dict(Counter(all_words_in_dataset))
         if min_word_occurence > 0:
             word_counts = {lemma: count for lemma, count in
-                                word_counts.items() if count >= min_word_occurence}
+                           word_counts.items() if count >= min_word_occurence}
 
         total_words_count = len(all_words_in_dataset)
         self.words_weights = {
@@ -48,12 +49,14 @@ class SIFEmbedding(Estimator):
 
         return self
 
-    def transform(self, x: List[str]) -> np.ndarray:
+    def transform(self, x: Union[List[str], str]) -> np.ndarray:
         """
-        :param x: List of lemmas in a tweet.
+        :param x: List of lemmas in a tweet or raw tweet text.
         :return: Sentence embedding
         """
-        x = List[x]
+        if isinstance(x, str):
+            x = get_wcrft2_results_for_text(x)
+        x = list(x)
         sentence_embedding = self._get_sif_embedding(x)
 
         return sentence_embedding
@@ -110,8 +113,8 @@ class SIFEmbedding(Estimator):
         """
         Compute tweet content embedding using weighted average with
         removing the projection on the first principal component
-        :param We: We[i,:] is the vector for word i
-        :return: emb, emb[i, :] is the embedding for sentence i
+        :param sentences: sentences is a list of lemmatized tweet word list
+        :return: emb is a array of tweets embeddings
         """
         emb = self._get_weighted_average(sentences)
         emb = self._remove_pc(emb)
