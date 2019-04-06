@@ -24,8 +24,10 @@ class SIFEmbedding(Estimator):
 
         :param x: DataFrame which should containt tweet text lemmas
         :param y: None for compatibility
-        :param fit_params: min_word_occurences: int. Parameter limiting/filtering infrequent words
+        :param fit_params: min_word_occurences: int. Parameter limiting/filtering infrequent words.
                            smoothing: int. Smoothing value parameter.
+                           random_state: int. Parameter used for calculating princiapl components.
+
         :return: self
         """
         min_word_occurence = fit_params.get("min_word_occurences", 0)
@@ -39,13 +41,13 @@ class SIFEmbedding(Estimator):
 
         total_words_count = len(all_words_in_dataset)
         self.words_weights = {
-            word: smoothing / (smoothing + (count / total_words_count))
+            word.lower(): smoothing / (smoothing + (count / total_words_count))
             for word, count
             in word_counts.items()}
 
-        emb = self._get_weighted_average(x["lemmas"].tolist())
+        emb = self._get_weighted_average_embeddings(x["lemmas"].tolist())
 
-        self._pc = self._compute_pc(emb)
+        self._pc = self._compute_pc(emb, fit_params.get("random_state", 0))
 
         return self
 
@@ -66,7 +68,8 @@ class SIFEmbedding(Estimator):
         embeddings = self._get_sif_embedding(x["lemmas"].tolist())
         return embeddings
 
-    def _get_weighted_average(self, sentences: List[List[str]]) -> np.ndarray:
+    def _get_weighted_average_embeddings(self,
+                                         sentences: List[List[str]]) -> np.ndarray:
         """
         Compute the weighted average vectors for given tweet content lemmas.
         :param sentences: List of tweet content lemmas list.
@@ -88,14 +91,14 @@ class SIFEmbedding(Estimator):
                     sentence_word_weights)
         return emb
 
-    def _compute_pc(self, tweets_embeddings: np.ndarray) -> np.ndarray:
+    def _compute_pc(self, tweets_embeddings: np.ndarray, random_state) -> np.ndarray:
         """
         Compute the first principal components for given tweet embedding matrix.
         :param tweets_embeddings: array of tweet embeddings.
         :return: svd.component_: array of first pca principal component
         for each tweet embedding.
         """
-        svd = TruncatedSVD(n_components=1, n_iter=7, random_state=0)
+        svd = TruncatedSVD(n_components=1, n_iter=7, random_state=random_state)
         svd.fit(tweets_embeddings)
         return svd.components_
 
@@ -116,7 +119,7 @@ class SIFEmbedding(Estimator):
         :param sentences: sentences is a list of lemmatized tweet word list
         :return: emb is a array of tweets embeddings
         """
-        emb = self._get_weighted_average(sentences)
+        emb = self._get_weighted_average_embeddings(sentences)
         emb = self._remove_pc(emb)
         return emb
 

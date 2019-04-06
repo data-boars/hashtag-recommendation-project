@@ -1,4 +1,5 @@
-from typing import *
+from collections import Counter
+from typing import Optional, List
 
 import pandas as pd
 from sklearn.base import TransformerMixin, BaseEstimator

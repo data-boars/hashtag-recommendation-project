@@ -9,11 +9,11 @@ import scipy.sparse as sps
 import tqdm
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from tweet_recommendations.other_methods.method import Method
 from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
-from estimator import Estimator
 
 
-class GraphSummarizationEstimator(Estimator):
+class GraphSummarizationMethod(Method):
     def __init__(self,
                  minimal_random_walk_change_difference_value: float,
                  damping_factor: float,
@@ -102,7 +102,8 @@ class GraphSummarizationEstimator(Estimator):
 
     def _get_binary_incidence_matrix(self):
         # needed to preserve ordering
-        all_labels = np.concatenate((self._hashtag_labels, self._tweet_labels, self._users_labels))
+        all_labels = np.concatenate(
+            (self._hashtag_labels, self._tweet_labels, self._users_labels))
         incidence_matrix = nx.adjacency_matrix(self.graph, nodelist=all_labels)
 
         return incidence_matrix
@@ -132,7 +133,8 @@ class GraphSummarizationEstimator(Estimator):
         if self.verbose:
             print("Building graph ...")
             tqdm.tqdm.pandas()
-            x.progress_apply(lambda r: self._transform_single_row(hashtag_agg, r), axis=1)
+            x.progress_apply(lambda r: self._transform_single_row(hashtag_agg, r),
+                             axis=1)
         else:
             x.apply(lambda r: self._transform_single_row(hashtag_agg, r), axis=1)
 
@@ -144,7 +146,8 @@ class GraphSummarizationEstimator(Estimator):
 
         if self.verbose:
             print("Building incidence matrix ...")
-        incidence_matrix = self._get_binary_incidence_matrix()[:len(self._hashtag_labels), len(self._hashtag_labels):]
+        incidence_matrix = self._get_binary_incidence_matrix()[
+                           :len(self._hashtag_labels), len(self._hashtag_labels):]
         weighted_adjacency_matrix_of_tags = incidence_matrix.dot(incidence_matrix.T)
         weighted_adjacency_matrix_of_tags.setdiag(0)
 
@@ -153,9 +156,11 @@ class GraphSummarizationEstimator(Estimator):
 
         hashtag_graph = nx.from_scipy_sparse_matrix(weighted_adjacency_matrix_of_tags)
 
-        weighted_degree = np.asarray(list(map(itemgetter(1), hashtag_graph.degree(weight="weight"))))
+        weighted_degree = np.asarray(
+            list(map(itemgetter(1), hashtag_graph.degree(weight="weight"))))
         matrix_weighted_degree = sps.diags([1 / (weighted_degree + 1e-8)], [0])
-        self._transition_matrix = weighted_adjacency_matrix_of_tags.dot(matrix_weighted_degree)
+        self._transition_matrix = weighted_adjacency_matrix_of_tags.dot(
+            matrix_weighted_degree)
 
         if self.verbose:
             print("Calculating tf idf ...")
@@ -164,7 +169,8 @@ class GraphSummarizationEstimator(Estimator):
 
         # it has normalization inside, so no L2 is necessary
         self._hashtags_tf_idf_vectorizer = TfidfVectorizer(norm="l2")
-        self._hashtags_tf_idf_representation = self._hashtags_tf_idf_vectorizer.fit_transform(document_list)
+        self._hashtags_tf_idf_representation = self._hashtags_tf_idf_vectorizer.fit_transform(
+            document_list)
 
         return self
 
@@ -184,7 +190,8 @@ class GraphSummarizationEstimator(Estimator):
         tf_idf_vector = self._hashtags_tf_idf_vectorizer.transform([x])
 
         # ... so this simplifies to cosine similarity - no normalisation required
-        similarities = np.squeeze(self._hashtags_tf_idf_representation.dot(tf_idf_vector.T).toarray())
+        similarities = np.squeeze(
+            self._hashtags_tf_idf_representation.dot(tf_idf_vector.T).toarray())
         similarity_rank_vertices = self._random_walk(similarities)
 
         best_indices = np.argsort(-similarities * similarity_rank_vertices)
@@ -203,7 +210,9 @@ class GraphSummarizationEstimator(Estimator):
         query_hashtag_index = np.argmax(similarities)
         preference_vector = np.zeros((len(self._hashtag_labels, )))[..., np.newaxis]
         preference_vector[query_hashtag_index] = 1
-        preference_vector = sps.csr_matrix(preference_vector, shape=preference_vector.shape, dtype=np.float32)
+        preference_vector = sps.csr_matrix(preference_vector,
+                                           shape=preference_vector.shape,
+                                           dtype=np.float32)
         similarity_rank_vertices = preference_vector
         nb_iteration = 0
         while True:
@@ -211,10 +220,12 @@ class GraphSummarizationEstimator(Estimator):
             if self.verbose:
                 print("Step: {}".format(nb_iteration + 1))
 
-            similarity_rank_vertices = self.damping_factor * self._transition_matrix.dot(similarity_rank_vertices) + (
-                    1 - self.damping_factor) * preference_vector
+            similarity_rank_vertices = self.damping_factor * self._transition_matrix.dot(
+                similarity_rank_vertices) + (
+                                               1 - self.damping_factor) * preference_vector
 
-            diff = np.sum(np.abs(similarity_rank_vertices - previous_similarity_rank_vertices))
+            diff = np.sum(
+                np.abs(similarity_rank_vertices - previous_similarity_rank_vertices))
             if nb_iteration > 0 and diff < self.minimal_random_walk_change_difference_value:
                 if self.verbose:
                     print("Converged with error: {:.6f}".format(diff))
@@ -224,7 +235,8 @@ class GraphSummarizationEstimator(Estimator):
 
             if nb_iteration > self.max_iterations:
                 if self.verbose:
-                    print("Random walk did not converge, current error: {:.6f}".format(diff))
+                    print("Random walk did not converge, current error: {:.6f}".format(
+                        diff))
                 break
         return np.squeeze(similarity_rank_vertices.toarray())
 

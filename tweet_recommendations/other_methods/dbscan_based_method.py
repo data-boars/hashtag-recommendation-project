@@ -1,6 +1,6 @@
-from collections import namedtuple
+from collections import namedtuple, Counter
 from itertools import chain
-from typing import *
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -8,7 +8,7 @@ from scipy.spatial.distance import cosine
 from sklearn.cluster import DBSCAN
 from sklearn.neighbors.kd_tree import KDTree
 
-from ..estimator import Estimator
+from tweet_recommendations.estimator import Estimator
 
 CentroidData = namedtuple("CentroidData", ["cluster_medoid", "popular_hashtags"])
 
@@ -38,29 +38,39 @@ class DBScanBasedEstimator(Estimator):
         """
         minimal_hashtag_occurence = fit_params["minimal_hashtag_occurence"]
 
-        x = self.drop_tweets_with_hashtags_that_occurred_less_than(x, minimal_hashtag_occurence)
+        if self.verbose:
+            print(f"Data input shape: {x.shape}")
+
+        x = self.drop_tweets_with_hashtags_that_occurred_less_than(x,
+                                                                   minimal_hashtag_occurence)
         embeddings = np.array(x["embedding"].to_list())
 
-        print(embeddings.shape)
+        if self.verbose:
+            print(f"Data embedding shape, after "
+                  f"droping data by given criteria: {embeddings.shape}")
 
         self.neighbours = KDTree(embeddings, metric="euclidean")
         epsilon = np.mean(self.neighbours.query(embeddings, k=2)[0][:, 1])
-        print(f"Found epsilon: {epsilon}")
+
+        if self.verbose:
+            print(f"Found epsilon: {epsilon}")
 
         self.clusterizer = DBSCAN(metric='manhattan', eps=epsilon, min_samples=1)
         x["cluster_label"] = self.clusterizer.fit_predict(embeddings)
 
-        print("Clustering finished.")
+        if self.verbose:
+            print("Clustering finished.")
 
         x["hashtags"] = x["hashtags"].apply(lambda r: [elem["text"] for elem in r])
 
         grouped_clusters = x.groupby(["cluster_label"])
 
-        print("Clusters grouped. Building cluster data")
+        if self.verbose:
+            print("Clusters grouped. Building cluster data")
 
         for cluster_number, cluster in grouped_clusters:
             cluster_embeddings = np.array(cluster["embedding"].to_list())
-            cluster_center = np.average(cluster_embeddings, axis=0).reshape(1, -1)
+            cluster_center = np.mean(cluster_embeddings, axis=0).reshape(1, -1)
             kd_tree = KDTree(cluster_embeddings, metric="euclidean")
             cluster_medoid_index = kd_tree.query(cluster_center, k=1)[1][0]
             cluster_medoid = cluster_embeddings[cluster_medoid_index]
