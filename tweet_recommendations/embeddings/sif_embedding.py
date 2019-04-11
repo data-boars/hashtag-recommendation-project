@@ -63,11 +63,6 @@ class SIFEmbedding(Estimator):
 
         return sentence_embedding
 
-    def fit_transform(self, x: pd.DataFrame, y=None, **fit_params) -> np.ndarray:
-        self.fit(x, y, **fit_params)
-        embeddings = self._get_sif_embedding(x["lemmas"].tolist())
-        return embeddings
-
     def _get_weighted_average_embeddings(self,
                                          sentences: List[List[str]]) -> np.ndarray:
         """
