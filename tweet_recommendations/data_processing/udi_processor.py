@@ -18,7 +18,7 @@ SINGLE_FIELDS = [
     "URL",
     "ID",
     "Time",
-    "Retcount",
+    "RetCount",
     "Favorite",
     "MentionedEntities",
     "Hashtags",
@@ -70,14 +70,15 @@ def _parse_and_save(
     """
     absolute_input_path = input_dir / input_filename
 
-    output_filename = Path(f"{input_filename}.pkl")
+    output_filename = Path(f"{input_filename}.csv")
     absolute_output_path = output_dir / output_filename
     try:
         if not absolute_output_path.exists():
             single_dataframe = _parse_file(
                 absolute_input_path, minimal_hashtags=minimal_hashtags
             )
-            single_dataframe.to_pickle(absolute_output_path)
+            if not single_dataframe.empty:
+                single_dataframe.to_csv(absolute_output_path)
     except KeyboardInterrupt:
         raise
     except Exception:
@@ -86,8 +87,7 @@ def _parse_and_save(
 
 
 def _parse_file(filename: str, minimal_hashtags: int = 0) -> pd.DataFrame:
-    """Parse single file from UDI Dataset and returns structured DataFrame
-    """
+    """Parse single file from UDI Dataset and return structured DataFrame"""
     with open(filename, "r", encoding="utf-8") as tweets_file:
         file_lines = tweets_file.readlines()
 
