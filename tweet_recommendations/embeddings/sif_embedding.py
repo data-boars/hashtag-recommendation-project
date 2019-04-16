@@ -7,11 +7,11 @@ from typing import List, Optional, Union
 from sklearn.decomposition import TruncatedSVD
 
 from tweet_recommendations.embeddings.word2vec import load_w2v_model
-from tweet_recommendations.estimator import Estimator
+from tweet_recommendations.other_methods.method import Method
 from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 
 
-class SIFEmbedding(Estimator):
+class SIFEmbedding(Method):
 
     def __init__(self, w2v_model_path: str):
         self.w2v_keyed_vector = load_w2v_model(w2v_model_path)
