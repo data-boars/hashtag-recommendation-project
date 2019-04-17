@@ -66,8 +66,7 @@ def udi_parse_dataset(
 def _parse_and_save(
     input_filename: str, input_dir: Path, output_dir: Path, minimal_hashtags: int = 0
 ) -> None:
-    """Parse and save single file
-    """
+    """Parse and save single file"""
     absolute_input_path = input_dir / input_filename
 
     output_filename = Path(f"{input_filename}.csv")
@@ -126,8 +125,7 @@ def _parse_file(filename: str, minimal_hashtags: int = 0) -> pd.DataFrame:
 
 
 def _parse_single_line(splitted_line: str) -> Tuple[str, str]:
-    """Parse single-lined fields
-    """
+    """Parse single-lined fields"""
     key = splitted_line[0]
 
     splitted_values = splitted_line[1:]
