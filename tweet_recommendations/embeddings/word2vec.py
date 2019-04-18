@@ -6,7 +6,7 @@ from gensim.models import KeyedVectors
 
 
 def load_w2v_model(w2v_model_path: str) -> KeyedVectors:
-    return KeyedVectors.load_word2vec_format(w2v_model_path, binary=False)
+    return KeyedVectors.load(w2v_model_path, mmap="r")
 
 
 def get_w2v_tweets_embeddings(twitter_data: List[Tuple[str, List[str], str]], w2v_model: KeyedVectors) -> pd.DataFrame:
@@ -24,10 +24,14 @@ def get_w2v_tweets_embeddings(twitter_data: List[Tuple[str, List[str], str]], w2
 
 def get_w2v_tweet_embedding(tweet_word_list: List[str], w2v_model: KeyedVectors) -> np.ndarray:
     all_embeddings = []
+    total_words = 0
+    error_words = 0
     for word in tweet_word_list:
         try:
             word_embedding = w2v_model[word.lower()]
             all_embeddings.append(word_embedding)
         except Exception:
-            print("Key '{}' not found in w2v dict".format(word))
+            error_words += 1
+        total_words += 1
+    print("Percentage of words not found: {:.4f}".format(error_words / total_words))
     return np.mean(all_embeddings, axis=0)
