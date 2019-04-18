@@ -1,9 +1,10 @@
 from collections import Counter
 from itertools import chain
-
-import pandas as pd
-import numpy as np
 from typing import List, Optional, Union
+
+import numpy as np
+import pandas as pd
+import tqdm
 from sklearn.decomposition import TruncatedSVD
 
 from tweet_recommendations.embeddings.word2vec import load_w2v_model
@@ -13,7 +14,11 @@ from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 
 class SIFEmbedding(Method):
 
-    def __init__(self, w2v_model_path: str):
+    def __init__(self, w2v_model_path: str, verbose: bool = False):
+        self.verbose = verbose
+
+        if self.verbose:
+            print("Loading w2v model ...")
         self.w2v_keyed_vector = load_w2v_model(w2v_model_path)
         self.words_weights = None
         self._pc = None
@@ -22,11 +27,11 @@ class SIFEmbedding(Method):
             **fit_params) -> "SIFEmbedding":
         """
 
-        :param x: DataFrame which should containt tweet text lemmas
+        :param x: DataFrame which should contain tweet text lemmas
         :param y: None for compatibility
-        :param fit_params: min_word_occurences: int. Parameter limiting/filtering infrequent words.
+        :param fit_params: min_word_occurrences: int. Parameter limiting/filtering infrequent words.
                            smoothing: int. Smoothing value parameter.
-                           random_state: int. Parameter used for calculating princiapl components.
+                           random_state: int. Parameter used for calculating principal components.
 
         :return: self
         """
@@ -47,24 +52,31 @@ class SIFEmbedding(Method):
 
         emb = self._get_weighted_average_embeddings(x["lemmas"].tolist())
 
-        self._pc = self._compute_pc(emb, fit_params.get("random_state", 0))
+        self._pc = self._compute_pc(emb, fit_params.get("random_state", None))
 
         return self
 
-    def transform(self, x: Union[List[str], str]) -> np.ndarray:
+    def transform(self, x: Union[List[List[str]], List[str]], **kwargs) -> np.ndarray:
         """
-        :param x: List of lemmas in a tweet or raw tweet text.
-        :return: Sentence embedding
+        For a given tweet represented as a list of lemmas recommends hashtags.
+        :param x: list of list of str or list of str. If first argument of x is a list is str, it is assumed that list
+            contains already lemmatized text. If single str is present as first element, it is assumed
+            that lemmatization has to be performed.
+        :return: np.ndarray of sentences embeddings.
         """
-        if isinstance(x, str):
-            x = get_wcrft2_results_for_text(x)
-        x = list(x)
-        sentence_embedding = self._get_sif_embedding(x)
+        lemmatized = []
+        if isinstance(x, pd.DataFrame):
+            lemmatized = x["lemmas"].to_list()
+        elif isinstance(x[0], str):
+            for i, xi in enumerate(x):
+                lemmatized.append(get_wcrft2_results_for_text(xi))
+        elif isinstance(x[0], list):
+            for i, xi in enumerate(x):
+                lemmatized.append(xi)
+        output = self._get_sif_embedding(lemmatized)
+        return np.asarray(output)
 
-        return sentence_embedding
-
-    def _get_weighted_average_embeddings(self,
-                                         sentences: List[List[str]]) -> np.ndarray:
+    def _get_weighted_average_embeddings(self, sentences: List[List[str]]) -> np.ndarray:
         """
         Compute the weighted average vectors for given tweet content lemmas.
         :param sentences: List of tweet content lemmas list.
@@ -72,18 +84,23 @@ class SIFEmbedding(Method):
         """
         n_samples = len(sentences)
         emb = np.zeros((n_samples, self.w2v_keyed_vector.vector_size))
-        for i in range(n_samples):
+        for i in tqdm.trange(n_samples, disable=not self.verbose):
             if sentences[i]:
                 words_embeddings = []
                 words_weights = []
                 for word in sentences[i]:
-                    words_embeddings.append(self.get_word_vector(word.lower()))
-                    words_weights.append(self.words_weights.get(word.lower(), 0))
+                    try:
+                        word_embedding = self.w2v_keyed_vector[word.lower()]
+                        words_embeddings.append(word_embedding)
+                        words_weights.append(self.words_weights.get(word.lower(), 0))
+                    except KeyError:
+                        continue
                 sentence_word_embeddings = np.array(words_embeddings)
                 sentence_word_weights = np.array(words_weights)
 
-                emb[i, :] = sentence_word_weights.dot(sentence_word_embeddings) / len(
-                    sentence_word_weights)
+                if len(sentence_word_weights) > 0:
+                    emb[i, :] = sentence_word_weights.dot(sentence_word_embeddings) / len(
+                        sentence_word_weights)
         return emb
 
     def _compute_pc(self, tweets_embeddings: np.ndarray, random_state) -> np.ndarray:
@@ -117,12 +134,3 @@ class SIFEmbedding(Method):
         emb = self._get_weighted_average_embeddings(sentences)
         emb = self._remove_pc(emb)
         return emb
-
-    def get_word_vector(self, word: str) -> np.ndarray:
-        try:
-            word_embedding = self.w2v_keyed_vector[word.lower()]
-        except Exception:
-            print(
-                "Key '{}' not found in w2v keyed vector. Returning zeros.".format(word))
-            word_embedding = np.zeros(self.w2v_keyed_vector.vector_size)
-        return word_embedding
