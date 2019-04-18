@@ -32,13 +32,14 @@ def udi_parse_dataset(
     minimal_hashtags: int = 0,
     parallelism: int = 2,
 ) -> None:
-    """Parse whole dataset in UDI format, save results as structured DataFrames
+    """
+    Parse whole dataset in UDI format, save results as structured DataFrames
 
-    dataset_dir: directory containing data files
-    output_dir: directory designated for processed files
-    verbose: enables console outputs
-    minimal_hashtags: minimal number of hashtags tweet has to have to be saved
-    parallelism: number of concurrent jobs
+    :param dataset_dir: directory containing data files
+    :param output_dir: directory designated for processed files
+    :param verbose: enables console outputs, defaults to False
+    :param minimal_hashtags: minimal number of hashtags tweet has to have to be saved
+    :param parallelism: number of concurrent jobs
     """
     parallelism = max(1, parallelism)
     dataset_dir = Path(dataset_dir)
@@ -66,7 +67,15 @@ def udi_parse_dataset(
 def _parse_and_save(
     input_filename: str, input_dir: Path, output_dir: Path, minimal_hashtags: int = 0
 ) -> None:
-    """Parse and save single file"""
+    """
+    Parse and save single file as CSV.
+    This is an entrypoint for concurrent subprocesses.
+
+    :param input_filename: name of processed file
+    :param input_dir: directory containing data files
+    :param output_dir: directory containing output files
+    :param minimal_hashtags: minimal hashtags for a single tweet to be saved
+    """
     absolute_input_path = input_dir / input_filename
 
     output_filename = Path(f"{input_filename}.csv")
@@ -86,7 +95,13 @@ def _parse_and_save(
 
 
 def _parse_file(filename: str, minimal_hashtags: int = 0) -> pd.DataFrame:
-    """Parse single file from UDI Dataset and return structured DataFrame"""
+    """
+    Parse single file from UDI Dataset and return structured DataFrame
+
+    :param filename: path to parsed file
+    :param minimal_hashtags: minimal hashtags for tweet to be saved
+    :return: structured DataFrame
+    """
     with open(filename, "r", encoding="utf-8") as tweets_file:
         file_lines = tweets_file.readlines()
 
@@ -125,7 +140,12 @@ def _parse_file(filename: str, minimal_hashtags: int = 0) -> pd.DataFrame:
 
 
 def _parse_single_line(splitted_line: str) -> Tuple[str, str]:
-    """Parse single-lined fields"""
+    """
+    Parse single-lined fields
+
+    :param splitted_line: single line of text in format `Key: value`
+    :return: parsed line as tuple (key, value)
+    """
     key = splitted_line[0]
 
     splitted_values = splitted_line[1:]
@@ -136,13 +156,18 @@ def _parse_single_line(splitted_line: str) -> Tuple[str, str]:
 
 
 def _parse_value(key: str, value: str) -> Union[List, bool, int, str]:
-    """Parses values for single-lined fields.
+    """
+    Parses values for single-lined fields.
 
     Specifically:
     - build lists of hashtags and mentions from raw text
     - convert "Favorite" field into proper boolean
     - convert retweet count to number
     Everything else is left as-is.
+
+    :param key: key of current field
+    :param value: value assigned to the field
+    :return: parsed value, according to above rules
     """
     if key in ("Hashtags", "MentionedEntities"):
         parsed_value = value.strip()
