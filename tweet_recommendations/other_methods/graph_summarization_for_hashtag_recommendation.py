@@ -122,7 +122,7 @@ class GraphSummarizationMethod(Method):
         self.graph = nx.Graph()
         minimal_hashtag_occurence = fit_params["minimal_hashtag_occurence"]
 
-        x = self.drop_hashtag_that_occurred_less_than(x, minimal_hashtag_occurence)
+        x = self.drop_tweets_with_hashtags_that_occurred_less_than(x, minimal_hashtag_occurence)
 
         hashtag_agg = defaultdict(list)
 
