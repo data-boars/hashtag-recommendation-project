@@ -1,7 +1,7 @@
 import warnings
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from operator import itemgetter
-from typing import Union, Dict, Collection, Optional
+from typing import Dict, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -185,25 +185,28 @@ class GraphSummarizationMethod(Method):
 
         return self
 
-    def transform(self, x: Union[Collection[Collection[str]], Collection[str]], **kwargs) -> np.ndarray:
+    def transform(self, x: Union[Tuple[Tuple[str]], Tuple[str]], **kwargs) -> np.ndarray:
         """
         For a given tweet represented as a list of lemmas recommends hashtags.
-        :param x: list of str or str. If list is str, strs are lemmas of the tweet. If single str, it is assumed that
+        :param x: tuple of str or str. If tuple is str, strs are lemmas of the tweet. If single str, it is assumed that
             lemmatization has to be performed.
         :key query: Iterable[str]. Optional query hashtag for each tweet in `x`.
         :return: np.ndarray of recommended hashtags.
         """
-        if isinstance(x[0], str):
-            for i, xi in enumerate(x):
-                x[i] = get_wcrft2_results_for_text(xi)
-        if isinstance(x[0], list):
-            for i, xi in enumerate(x):
-                x[i] = ' '.join(xi)
+        lemmatised = list(x[:])
+        if isinstance(lemmatised[0], str):
+            for i, xi in enumerate(lemmatised):
+                lemmatised[i] = get_wcrft2_results_for_text(xi)
+        if isinstance(lemmatised[0], list):
+            for i, xi in enumerate(lemmatised):
+                lemmatised[i] = ' '.join(xi)
 
         query_hashtags = kwargs.get("query", None)
         if query_hashtags is not None:
             assert len(query_hashtags) == len(x), \
                 "If at least 1 query is given, the array should have the same dimension as input `x`"
+        if isinstance(query_hashtags, str):
+            query_hashtags = [query_hashtags] * len(lemmatised)
 
         # as in fit, vectorizer has normalization inside ...
         tf_idf_vectors = self._hashtags_tf_idf_vectorizer.transform(x)
@@ -218,7 +221,7 @@ class GraphSummarizationMethod(Method):
         return self.post_process_result(result)
 
     def _get_preference_vectors(self, tweet_content_similarities: np.ndarray,
-                                query_hashtags: Optional[Collection[str]]) -> sps.csr_matrix:
+                                query_hashtags: Optional[Tuple[str]]) -> sps.csr_matrix:
         """
         Creates sparse matrix of preference vectors for each of N samples to recommend which are used to initialize
         random walk algorithm. If a query hashtag for a particular tweet is given, then it is used to create preference
@@ -229,6 +232,7 @@ class GraphSummarizationMethod(Method):
             the paper.
         :return: Sparse matrix of N one hot vectors.
         """
+
         def _get_using_similarities(similarity_vector):
             query_hashtag_index = np.argmax(similarity_vector)
             vec = np.zeros((len(self._hashtag_labels),))
