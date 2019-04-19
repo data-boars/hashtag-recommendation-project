@@ -117,7 +117,7 @@ def _parse_and_save(
         if queue:
             queue.put(single_dataframe)
         elif not single_dataframe.empty:
-            single_dataframe.to_csv(absolute_output_path)
+            single_dataframe.to_csv(absolute_output_path, index=False)
     except KeyboardInterrupt:
         raise
     except Exception:
