@@ -11,16 +11,8 @@ parser.add_argument("w2v_path")
 args = parser.parse_args()
 
 tweets_with_lemmas = pd.read_pickle("data/source_data/original_tweets_with_lemmas.p")
-sif = SIFEmbedding(args.w2v_path, verbose=True)
-tweet_embeddings = sif.fit_transform(tweets_with_lemmas, None)
 
-sif_embeddings_as_array = [tweet_embeddings[i, :] for i in range(tweet_embeddings.shape[0])]
-
-tweets_with_lemmas["embedding"] = np.nan
-tweets_with_lemmas.embedding.astype(object)
-tweets_with_lemmas["embedding"] = pd.Series(sif_embeddings_as_array)
-
-dbs = DBScanBasedEstimator(sif, verbose=True)
+dbs = DBScanBasedEstimator(args.w2v_path, verbose=True)
 dbs.fit(tweets_with_lemmas, minimal_hashtag_occurence=10)
 
 print("Predicting ... ")

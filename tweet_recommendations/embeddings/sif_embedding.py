@@ -5,21 +5,28 @@ from typing import List, Optional, Union
 import numpy as np
 import pandas as pd
 import tqdm
+from gensim.models import KeyedVectors
 from sklearn.decomposition import TruncatedSVD
 
-from tweet_recommendations.embeddings.word2vec import load_w2v_model
 from tweet_recommendations.other_methods.method import Method
 from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 
 
 class SIFEmbedding(Method):
 
-    def __init__(self, w2v_model_path: str, verbose: bool = False):
+    def __init__(self, path_to_keyedvectors_model: str, verbose: bool = False):
+        """
+        Method for creating embeddings out of words and combining them into single tweet embedding with modified
+        weighted average of those embeddings.
+        :param path_to_keyedvectors_model: Path to converted by script `convert_embedding_model_to_mmap.py` gensim
+            model. It can either word2vec or fasttext, `gensim` handles both.
+        :param verbose: Whether method should be verbose.
+        """
         self.verbose = verbose
 
         if self.verbose:
-            print("Loading w2v model ...")
-        self.w2v_keyed_vector = load_w2v_model(w2v_model_path)
+            print("Loading keyed vectors model ...")
+        self.keyed_vector_model = KeyedVectors.load(path_to_keyedvectors_model, mmap="r")
         self.words_weights = None
         self._pc = None
 
@@ -50,7 +57,7 @@ class SIFEmbedding(Method):
             for word, count
             in word_counts.items()}
 
-        emb = self._get_weighted_average_embeddings(x["lemmas"].tolist())
+        emb = self._get_weighted_average_embeddings(x["lemmas"].values)
 
         self._pc = self._compute_pc(emb, fit_params.get("random_state", None))
 
@@ -83,14 +90,14 @@ class SIFEmbedding(Method):
         :return: Weighted average of tweet embeddings.
         """
         n_samples = len(sentences)
-        emb = np.zeros((n_samples, self.w2v_keyed_vector.vector_size))
+        emb = np.zeros((n_samples, self.keyed_vector_model.vector_size))
         for i in tqdm.trange(n_samples, disable=not self.verbose):
             if sentences[i]:
                 words_embeddings = []
                 words_weights = []
                 for word in sentences[i]:
                     try:
-                        word_embedding = self.w2v_keyed_vector[word.lower()]
+                        word_embedding = self.keyed_vector_model.word_vec(word.lower())
                         words_embeddings.append(word_embedding)
                         words_weights.append(self.words_weights.get(word.lower(), 0))
                     except KeyError:

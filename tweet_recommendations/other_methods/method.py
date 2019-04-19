@@ -22,7 +22,7 @@ class Method(TransformerMixin, BaseEstimator):
         return filtered_tags
 
     @classmethod
-    def drop_tweets_which_not_contain_given_hashtags(cls, data: pd.DataFrame, filtered_tags: List[str]) -> pd.DataFrame:
+    def drop_tweets_without_given_hashtags(cls, data: pd.DataFrame, filtered_tags: List[str]) -> pd.DataFrame:
         data["hashtags"] = data["hashtags"].apply(
             lambda x: [elem for elem in x if elem["text"] in filtered_tags])
         data = data.drop(data[data["hashtags"].str.len() == 0].index)

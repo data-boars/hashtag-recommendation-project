@@ -10,6 +10,7 @@ from scipy.spatial import cKDTree as KDTree, distance
 from sklearn.cluster import DBSCAN
 from sklearn.metrics.pairwise import cosine_distances
 
+from tweet_recommendations.embeddings.sif_embedding import SIFEmbedding
 from tweet_recommendations.other_methods.method import Method
 
 # "Finally, we use one as the number of minPoints and the average value of this vector as epsilon."
@@ -18,11 +19,17 @@ MIN_SAMPLES = 1
 
 
 class DBScanBasedEstimator(Method):
-    def __init__(self, embedding_method: Method, verbose: bool = False):
+    def __init__(self, path_to_keyedvectors_model: str, verbose: bool = False):
+        """
+        Hashtag recommendation method implementation based on https://bit.ly/2V3tnWX.
+        :param path_to_keyedvectors_model: Path to converted by script `convert_embedding_model_to_mmap.py` gensim
+        model. It can either word2vec or fasttext, `gensim` handles both.
+        :param verbose: Whether method should be verbose
+        """
         self._clusters: np.ndarray = None
 
         self.clusterizer = None
-        self.embedding_method = embedding_method
+        self.sif_embedding = SIFEmbedding(path_to_keyedvectors_model, verbose)
         self.neighbours = None
         self._centroids_data = []
         self._corresponding_to_centroids_data_hashtags = []
@@ -44,35 +51,27 @@ class DBScanBasedEstimator(Method):
         :return: self.
         """
         minimal_hashtag_occurence = fit_params.get("minimal_hashtag_occurence", 10)
-
-        # the value below is so high because otherwise the `epsilon` basing on this would be so small that there would
-        # as many clusters as there are samples in dataset
-        neighbours_count = fit_params.get("neighbours_count", 256)
+        neighbours_count = fit_params.get("neighbours_count", 16)
 
         if self.verbose:
             print(f"Data input shape: {x.shape}")
 
-        valid_hashtags = self.drop_tweets_with_hashtags_that_occurred_less_than(x,
-                                                                                minimal_hashtag_occurence)
-        x = self.drop_tweets_which_not_contain_given_hashtags(x, valid_hashtags)
+        valid_hashtags = self.drop_tweets_with_hashtags_that_occurred_less_than(x, minimal_hashtag_occurence)
+        x = self.drop_tweets_without_given_hashtags(x, valid_hashtags).reset_index()
 
         if self.verbose:
             print("Setup tweet embedding method")
-
-        self.embedding_method.fit(x)
-
-        if self.verbose:
             print("Tweet content lemmas embedding started")
 
-        embeddings = self.embedding_method.transform(x["lemmas"])
+        embeddings = self.sif_embedding.fit_transform(x, None)
+        x["embedding"] = pd.Series(embeddings.tolist())
 
         if self.verbose:
-            print(f"Data embedding shape, after "
-                  f"droping data by given criteria: {embeddings.shape}")
+            print(f"Data embedding shape, after droping data by given criteria: {embeddings.shape}")
 
         self.neighbours = KDTree(embeddings)
 
-        epsilon = np.mean(self.neighbours.query(embeddings, k=neighbours_count, n_jobs=mp.cpu_count())[0])
+        epsilon = np.mean(self.neighbours.query(embeddings, k=neighbours_count, n_jobs=mp.cpu_count(), p=1)[0])
 
         if self.verbose:
             print(f"Found epsilon: {epsilon}")
@@ -99,18 +98,18 @@ class DBScanBasedEstimator(Method):
                                                  disable=not self.verbose):
             cluster_embeddings = np.vstack(cluster["embedding"].to_numpy())
             cluster_center = np.mean(cluster_embeddings, axis=0).reshape(1, -1)
-            distances = distance.cdist(cluster_center, cluster_embeddings)[0]  # matrix of shape (1 x N) is returned
 
-            cluster_medoid_index = np.argmin(
+            # matrix of shape (1 x N) is returned
+            distances = distance.cdist(cluster_center, cluster_embeddings, metric="cityblock")[0]
+
+            cluster_centroid_index = np.argmin(
                 distances)  # we are sure that it will not point to itself because mean center should be not existent
 
-            cluster_medoid = cluster_embeddings[cluster_medoid_index]
-            aggregated_hashtags = list(
-                chain.from_iterable(cluster["hashtags"].to_numpy()))
-            sorted_most_popular_hashtags = [hashtag for hashtag, count in
-                                            Counter(aggregated_hashtags).most_common()]
+            cluster_centroid = cluster_embeddings[cluster_centroid_index]
+            aggregated_hashtags = list(chain.from_iterable(cluster["hashtags"].to_numpy()))
+            sorted_most_popular_hashtags = [hashtag for hashtag, count in Counter(aggregated_hashtags).most_common()]
 
-            self._centroids_data.append(cluster_medoid)
+            self._centroids_data.append(cluster_centroid)
             self._corresponding_to_centroids_data_hashtags.append(sorted_most_popular_hashtags)
 
         self._centroids_data = np.vstack(self._centroids_data)
@@ -126,7 +125,7 @@ class DBScanBasedEstimator(Method):
             that lemmatization has to be performed.
         :return: Iterable of recommended hashtags.
         """
-        embeddings = self.embedding_method.transform(x)
+        embeddings = self.sif_embedding.transform(x)
         embeddings = embeddings if len(embeddings.shape) == 2 else embeddings.reshape(1, -1)
         distances = cosine_distances(embeddings, self._centroids_data)
         sorted_distances_indices = np.argsort(distances, axis=1)
@@ -137,6 +136,13 @@ class DBScanBasedEstimator(Method):
 
     @classmethod
     def post_process_result(cls, recommended_hashtags: np.ndarray) -> np.ndarray:
+        """
+        Flattens lists of recommended hashtags for each tweet. Two level list is leftover from the `fit` because tags
+        inside a single cluster are sorted according to their popularity.
+        :param recommended_hashtags: Two level list of recommended hashtags for each tweet and each tweet has
+            clusters of tags.
+        :return: np.ndarray of flattened list of recommended tags.
+        """
         result = []
         for tweet_tags in recommended_hashtags:
             result.append([tag for centroid_tags in tweet_tags for tag in centroid_tags])
