@@ -9,7 +9,7 @@ SPACE = " "
 
 
 def preprocess_dataset(
-    dataset_path: str, target_path: str, verbose: bool = False
+    dataset_path: str, target_path: str, verbose: bool = False, column: str = "Text"
 ) -> None:
     """
     Preprocess dataset:
@@ -19,12 +19,13 @@ def preprocess_dataset(
     :param dataset_path: Path to dataset directory with *.csv files
     :param target_path: Target directory for preprocessed dataset
     :param verbose: show `dask`'s progress bar
+    :param column: column name containing text in CSV file
     """
     nlp = spacy.load(SPACY_MODEL_NAME)
     dataset_path = Path(dataset_path) / "*.csv"
 
     def clear_tweet(row):
-        raw_text = str(row["Text"])
+        raw_text = str(row[column])
         analyzed_text = nlp(raw_text)
         processed_tokens = []
 
@@ -32,7 +33,7 @@ def preprocess_dataset(
             if not token.is_oov:
                 processed_tokens.append(token.lemma_)
 
-        row["Text"] = SPACE.join(processed_tokens)
+        row[column] = SPACE.join(processed_tokens)
         return row
 
     if verbose:
@@ -52,7 +53,17 @@ if __name__ == "__main__":
     parser.add_argument("input_path", type=str, help="Dataset directory")
     parser.add_argument("output_path", type=str, help="Target directory")
     parser.add_argument("--verbose", "-v", action="store_true")
+    parser.add_argument(
+        "--column",
+        "-c",
+        type=str,
+        help=(
+            "Column containing text in CSV file, ",
+            "Default: Text (as in UDI dataset)",
+        ),
+        default="Text",
+    )
 
     args = parser.parse_args()
 
-    preprocess_dataset(args.input_path, args.output_path, args.verbose)
+    preprocess_dataset(args.input_path, args.output_path, args.verbose, args.column)
