@@ -3,13 +3,14 @@ import os
 import sys
 from collections import deque
 from functools import partial
-from multiprocessing import Pool
+from multiprocessing import Pool, Queue
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Optional
 
 import pandas as pd
 from tqdm import tqdm
 
+MERGED_FILENAME = "UDI-TwitterCrawl-Aug2012.csv"
 TWEET_SEPARATOR = "***"
 VALUE_SEPARATOR = ":"
 MULTILINE_FIELDS = ["Text", "Origin"]
@@ -31,6 +32,7 @@ def udi_parse_dataset(
     verbose: bool = False,
     minimal_hashtags: int = 0,
     parallelism: int = 2,
+    merge: bool = False,
 ) -> None:
     """
     Parse whole dataset in UDI format, save results as structured DataFrames
@@ -40,13 +42,15 @@ def udi_parse_dataset(
     :param verbose: enables console outputs, defaults to False
     :param minimal_hashtags: minimal number of hashtags tweet has to have to be saved
     :param parallelism: number of concurrent jobs
+    :param merge: save single DataFrame (merge everything)
     """
     parallelism = max(1, parallelism)
     dataset_dir = Path(dataset_dir)
     output_dir = Path(output_dir)
     dataset_filenames = os.listdir(dataset_dir)
+    queue = Queue() if merge else None
 
-    with Pool(parallelism) as pool:
+    with Pool(parallelism, _init_parse_and_save, (queue,)) as pool:
         job = pool.imap(
             partial(
                 _parse_and_save,
@@ -63,12 +67,32 @@ def udi_parse_dataset(
         # https://docs.python.org/3/library/itertools.html#itertools-recipes
         deque(job, maxlen=0)
 
+    if merge:
+        _merge_and_save(queue, output_dir, verbose)
+
+
+def _merge_and_save(queue: Queue, output_dir: Path, verbose: bool = False):
+    df = pd.DataFrame()
+
+    if verbose:
+        print("Merging dataframes...")
+    while not queue.empty():
+        df = pd.concat((df, queue.get()), ignore_index=True)
+
+    if verbose:
+        print("Saving merged dataframe")
+    output_path = output_dir / MERGED_FILENAME
+    df.to_csv(output_path)
+
 
 def _parse_and_save(
-    input_filename: str, input_dir: Path, output_dir: Path, minimal_hashtags: int = 0
+    input_filename: str,
+    input_dir: Path,
+    output_dir: Optional[Path],
+    minimal_hashtags: int = 0,
 ) -> None:
     """
-    Parse and save single file as CSV.
+    Parse and save single file to CSV or store in a queue for merging.
     This is an entrypoint for concurrent subprocesses.
 
     :param input_filename: name of processed file
@@ -76,22 +100,40 @@ def _parse_and_save(
     :param output_dir: directory containing output files
     :param minimal_hashtags: minimal hashtags for a single tweet to be saved
     """
-    absolute_input_path = input_dir / input_filename
+    # `queue` will be initialized when Pool is created
+    queue = _parse_and_save.queue
 
+    absolute_input_path = input_dir / input_filename
     output_filename = Path(f"{input_filename}.csv")
     absolute_output_path = output_dir / output_filename
+
     try:
-        if not absolute_output_path.exists():
+        # Parse only if not already parsed, or in merge mode
+        if queue or not absolute_output_path.exists():
             single_dataframe = _parse_file(
                 absolute_input_path, minimal_hashtags=minimal_hashtags
             )
-            if not single_dataframe.empty:
-                single_dataframe.to_csv(absolute_output_path)
+
+        if queue:
+            queue.put(single_dataframe)
+        elif not single_dataframe.empty:
+            single_dataframe.to_csv(absolute_output_path)
     except KeyboardInterrupt:
         raise
     except Exception:
         print(absolute_output_path)
         print(sys.exc_info())
+
+
+def _init_parse_and_save(queue: Optional[Queue]) -> None:
+    """
+    Prepare `_parse_and_save` function to use `multiprocessing.Queue`.
+    This function should not be called manually, it is an initializer
+    for `multiprocessing.Pool`
+
+    :param queue: shared queue
+    """
+    _parse_and_save.queue = queue
 
 
 def _parse_file(filename: str, minimal_hashtags: int = 0) -> pd.DataFrame:
@@ -177,7 +219,7 @@ def _parse_value(key: str, value: str) -> Union[List, bool, int, str]:
             parsed_value = parsed_value.split(" ")
     elif key == "Favorite":
         parsed_value = bool(value)
-    elif key == "Retcount":
+    elif key == "RetCount":
         parsed_value = int(value)
     else:
         parsed_value = value
@@ -210,6 +252,12 @@ if __name__ == "__main__":
         default=2,
         help="Number of concurrent jobs for dataset parsing",
     )
+    parser.add_argument(
+        "--merge",
+        "-m",
+        action="store_true",
+        help="Merge all DataFrames into one, instead of saving one per single user",
+    )
 
     args = parser.parse_args()
 
@@ -219,4 +267,5 @@ if __name__ == "__main__":
         verbose=args.verbose,
         minimal_hashtags=args.min_hashtags,
         parallelism=args.parallelism,
+        merge=args.merge,
     )
