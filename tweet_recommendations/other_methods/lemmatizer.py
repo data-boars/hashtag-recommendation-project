@@ -12,7 +12,8 @@ class TaggerToygerLemmatizer(TransformerMixin, BaseEstimator):
         """
         self.path = path
         self.output_path = os.path.join(
-            os.path.dirname(self.path), os.pardir, "source_data", "original_tweets_with_lemmas.p"
+            os.path.dirname(self.path), os.pardir, "source_data",
+            "original_tweets_with_lemmas.p"
         )
         self.verbose = verbose
 
