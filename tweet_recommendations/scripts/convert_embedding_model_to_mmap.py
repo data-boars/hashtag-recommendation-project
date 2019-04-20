@@ -6,7 +6,7 @@ from gensim.models import FastText, KeyedVectors
 
 def convert_w2v(model_path: str, output_path: str):
     print("Loading ...")
-    model = KeyedVectors.load_word2vec_format(model_path, binary=True)
+    model = KeyedVectors.load_word2vec_format(model_path)
     print("Saving ...")
     model.save(output_path)
     print("Sanity check ...", end=" ")
@@ -29,7 +29,7 @@ def convert_fasttext(model_path: str, output_path: str):
 def main():
     parser = argparse.ArgumentParser("Converted of normally saved as a dict w2v model to mmaped file, so the model"
                                      "can be loaded almost immediately")
-    parser.add_argument("model_path", help="Path to model saved as *.bin")
+    parser.add_argument("model_path", help="Path to model saved as *.bin for fasttext and *.vec for w2v")
     parser.add_argument("output_path",
                         help="Path for an output file without an extension. "
                              "Two or three files will be saved, depending on the selected model type: "
