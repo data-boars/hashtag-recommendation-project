@@ -1,7 +1,7 @@
 import multiprocessing as mp
 from collections import Counter
 from itertools import chain
-from typing import List, Optional, Union
+from typing import Tuple, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -56,8 +56,7 @@ class DBScanBasedEstimator(Method):
         if self.verbose:
             print(f"Data input shape: {x.shape}")
 
-        valid_hashtags = self.drop_tweets_with_hashtags_that_occurred_less_than(x, minimal_hashtag_occurence)
-        x = self.drop_tweets_without_given_hashtags(x, valid_hashtags).reset_index()
+        x = self.drop_tweets_with_hashtags_that_occurred_less_than(x, minimal_hashtag_occurence)
 
         if self.verbose:
             print("Setup tweet embedding method")
@@ -117,11 +116,11 @@ class DBScanBasedEstimator(Method):
 
         return self
 
-    def transform(self, x: Union[List[List[str]], List[str]]) -> np.ndarray:
+    def transform(self, x: Union[Tuple[Tuple[str, ...]], Tuple[str, ...]], **kwargs) -> np.ndarray:
         """
         For a given tweet/tweets embeddings recommend hashtags.
-        :param x: list of list of str or list of str. If first argument of x is a list is str, it is assumed that list
-            contains already lemmatized text. If single str is present as first element, it is assumed
+        :param x: tuple of tuple of str or tuple of str. If first argument of x is a tuple is str, it is assumed that
+            tuple contains already lemmatized text. If single str is present as first element, it is assumed
             that lemmatization has to be performed.
         :return: Iterable of recommended hashtags.
         """
