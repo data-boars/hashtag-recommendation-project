@@ -1,6 +1,6 @@
 from collections import Counter
 from itertools import chain
-from typing import List, Optional, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -63,7 +63,7 @@ class SIFEmbedding(Method):
 
         return self
 
-    def transform(self, x: Union[List[List[str]], List[str]], **kwargs) -> np.ndarray:
+    def transform(self, x: Union[Tuple[Tuple[str, ...]], Tuple[str, ...]], **kwargs) -> np.ndarray:
         """
         For a given tweet represented as a list of lemmas recommends hashtags.
         :param x: list of list of str or list of str. If first argument of x is a list is str, it is assumed that list
