@@ -20,9 +20,9 @@ class PopularityMeasure(enum.Enum):
 class OurMethod(Method):
 
     def __init__(self, popularity_to_similarity_ratio: float,
-                 popularity_measure: PopularityMeasure = 'pagerank',
+                 popularity_measure: PopularityMeasure = "pagerank",
                  path_to_keyedvectors_model: Optional[str] = None,
-                 embedding_name: Optional[str] = 'embedding',
+                 embedding_name: Optional[str] = "embedding",
                  verbose: bool = False):
         """
         Our proposed hashtag recommendation method.
@@ -37,8 +37,8 @@ class OurMethod(Method):
         :param path_to_keyedvectors_model: Optional argument. Path to `gensim`
                 model converted by script `convert_embedding_model_to_mmap.py`.
                 It can be either word2vec or fasttext, `gensim` handles both.
-                When path isn't set, `embedding_name` argument is required.
-                Also `fit` and `transform` won't accept text input and will
+                When path isn"t set, `embedding_name` argument is required.
+                Also `fit` and `transform` won"t accept text input and will
                 have to contain column named the same as `embedding_name`.
                 You will have to provide precomputed embeddings.
         :param embedding_name: Optional, name of used embedding method.
@@ -73,23 +73,23 @@ class OurMethod(Method):
         if self.embedding_model is None:
             assert self.embedding_name in x.columns, \
                 "When no embedding model provided, input DataFrame should " \
-                "contain column named same as `embedding_name`."
+                "contain column named same as `self.embedding_name`."
         else:
-            assert 'lemmas' in x.columns, \
+            assert "lemmas" in x.columns, \
                 "When embedding model is provided input DataFrame should " \
-                "contain column 'lemmas'."
+                'contain column "lemmas".'
 
-        x = x[x['hashtags'].str.len() > 0]
+        x = x[x["hashtags"].str.len() > 0]
         if self.verbose:
             print("Removing tweets with too rare hashtags.")
         x = self.drop_tweets_with_hashtags_that_occurred_less_than(x, min_hashtag_count)
 
-        if isinstance(x['hashtags'].iloc[0][0], dict):
-            x['hashtags'] = x["hashtags"].apply(lambda t: [item["text"]
+        if isinstance(x["hashtags"].iloc[0][0], dict):
+            x["hashtags"] = x["hashtags"].apply(lambda t: [item["text"]
                                                            for item in t])
 
         if self.embedding_model is not None:
-            x[self.embedding_name] = self.embed_lemmas(x['lemmas'])
+            x[self.embedding_name] = self.embed_lemmas(x["lemmas"])
         else:
             assert len(x[self.embedding_name].iloc[0].shape) == 1, \
                 f"`{self.embedding_name}` column should contain single vectors."
@@ -101,27 +101,28 @@ class OurMethod(Method):
         if self.verbose:
             print(f"Dropped: {count_before - len(x)} rows.")
         if self.verbose:
-            print('Building Graph')
+            print("Building Graph")
         self._G = self._build_base_graph(x)
 
         if self.verbose:
-            print('Aggregating hashtag embeddings and mean retweets.')
+            print("Aggregating hashtag embeddings and mean retweets.")
         self._calculate_hashtag_embeddings_and_mean_retweets()
 
         if self.verbose:
-            print('Calculating PageRank.')
+            print("Calculating PageRank.")
         self._calculate_pagerank()
 
         if self.verbose:
-            print('Calculating edge weights.')
+            print("Calculating edge weights.")
         self._calculate_edge_weights()
 
-        hashtags = [{'hashtag': node, **self._G.nodes[node]}
+        hashtags = [{"hashtag": node, **self._G.nodes[node]}
                     for node in self._G.nodes
-                    if self._G.nodes[node]['node_type'] == 'hashtag']
+                    if self._G.nodes[node]["node_type"] == "hashtag"]
         self._hashtags_df = pd.DataFrame(hashtags)
 
-    def embed_lemmas(self, texts_lemmas):
+    def embed_lemmas(self, texts_lemmas: Union[Sequence[Sequence[str]],
+                                               pd.Series]):
         if not isinstance(texts_lemmas, pd.Series):
             texts_lemmas = pd.Series(texts_lemmas)
 
@@ -165,24 +166,25 @@ class OurMethod(Method):
         if self.verbose:
             print("Calculating similarities")
         sim = self.embedding_similarity(np.asarray(x), hashtag_emb)
-        sim = ((sim - sim.min(axis=1).reshape(-1, 1))
-               / (sim.max(axis=1) - sim.min(axis=1)
-                  + 1e-8).reshape(-1,1))
+        sim = self.normalise(sim)
+        print(sim.shape)
 
         pop = self._hashtags_df[self.popularity_measure].to_numpy()
-        pop = self.normalise(pop)
+        pop = self.normalise(pop.reshape(1, -1))
+        print(pop.shape)
         sim_pop = ((1 - self.ratio) * sim + (self.ratio * pop))
+        print(sim_pop.shape)
         result = []
         if self.verbose:
             print("Calculating ranking.")
         for i in tqdm.tqdm(range(len(x)), disable=not self.verbose):
             ranking = np.argsort(-sim_pop[i, :])
-            result.append(list(self._hashtags_df['hashtag'].iloc[ranking]))
+            result.append(list(self._hashtags_df["hashtag"].iloc[ranking]))
         return result
 
     def normalise(self, array: np.ndarray):
-        if not np.isclose(array.max(), array.min(), rtol=1e-8):
-            return (array - array.min()) / (array.max() - array.min())
+        array = array - array.min(axis=1).reshape(-1, 1)
+        array = array / (array.max(axis=1).reshape(-1, 1) + 1e-18)
         return array
 
     def embedding_similarity(self, x: np.ndarray, y: np.ndarray):
@@ -209,7 +211,7 @@ class OurMethod(Method):
 
         def add_row_to_graph(row, graph, embedding_name):
             if len(row["hashtags"]) > 0:
-                graph.add_node(row['id'])
+                graph.add_node(row["id"])
                 graph.node[row["id"]]["node_type"] = "tweet"
                 graph.node[row["id"]]["retweets"] = row["retweet_count"]
                 graph.node[row["id"]][embedding_name] = row[embedding_name]
@@ -239,21 +241,21 @@ class OurMethod(Method):
                 for neighbour in self._G.neighbors(node):
                     tweet = self._G.nodes[neighbour]
                     embeddings.append(tweet[self.embedding_name])
-                    retweets_counts.append(tweet['retweets'])
+                    retweets_counts.append(tweet["retweets"])
 
                 # hashtag embeddings
                 embeddings = np.asarray(embeddings)
                 self._G.nodes[node][self.embedding_name] = embeddings.mean(0)
                 # mean retweets
                 retweets_counts = np.asarray(retweets_counts)
-                self._G.nodes[node]['mean_retweets'] = retweets_counts.mean(0)
+                self._G.nodes[node]["mean_retweets"] = retweets_counts.mean(0)
 
     def _calculate_pagerank(self):
         graph_pagerank = nx.pagerank(self._G)
         nx.set_node_attributes(self._G, graph_pagerank, "pagerank")
 
-    def _calculate_edge_weights(self, distance_name: str = 'distance',
-                                similarity_name: str = 'similarity'):
+    def _calculate_edge_weights(self, distance_name: str = "distance",
+                                similarity_name: str = "similarity"):
         for (node_from, node_to,
              edge_features) in tqdm.tqdm(self._G.edges(data=True),
                                          total=len(self._G.edges),
