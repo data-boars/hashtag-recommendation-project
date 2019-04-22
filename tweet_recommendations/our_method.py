@@ -167,13 +167,11 @@ class OurMethod(Method):
             print("Calculating similarities")
         sim = self.embedding_similarity(np.asarray(x), hashtag_emb)
         sim = self.normalise(sim)
-        print(sim.shape)
 
         pop = self._hashtags_df[self.popularity_measure].to_numpy()
         pop = self.normalise(pop.reshape(1, -1))
-        print(pop.shape)
+        
         sim_pop = ((1 - self.ratio) * sim + (self.ratio * pop))
-        print(sim_pop.shape)
         result = []
         if self.verbose:
             print("Calculating ranking.")
