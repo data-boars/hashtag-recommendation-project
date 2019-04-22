@@ -8,14 +8,19 @@ import pandas as pd
 import networkx as nx
 import numpy as np
 import tqdm
-import scipy.spatial
+import enum
 from gensim.models import KeyedVectors
+
+
+class PopularityMeasure(enum.Enum):
+    PageRank = "pagerank"
+    MeanRetweets = "mean_retweets"
 
 
 class OurMethod(Method):
 
     def __init__(self, popularity_to_similarity_ratio: float,
-                 popularity_measure: str = 'pagerank',
+                 popularity_measure: PopularityMeasure = 'pagerank',
                  path_to_keyedvectors_model: Optional[str] = None,
                  embedding_name: Optional[str] = 'embedding',
                  verbose: bool = False):
@@ -47,12 +52,8 @@ class OurMethod(Method):
 
         assert 0 <= popularity_to_similarity_ratio <= 1,\
             "Ratio should be bound between 0 and 1"
-
-        assert popularity_measure in {'pagerank', 'mean_retweets'},\
-            "Popularity measure should be one of: pagerank, mean_retweets"
-
         self.ratio = popularity_to_similarity_ratio
-        self.popularity_measure = popularity_measure
+        self.popularity_measure = PopularityMeasure(popularity_measure).value
         self.embedding_name = embedding_name
 
         self.embedding_model = None
@@ -64,14 +65,6 @@ class OurMethod(Method):
         self._G: nx.Graph = None
         self._hashtags_df: pd.DataFrame = None
 
-    def set_popularity_measure(self, new_popularity_measure='pagerank'):
-        """
-        Setter method. Sets which popularity measure shall be used.
-        :param new_popularity_measure: Popularity measure to be used.
-                Available measures are: `pagerank` and `mean_retweets`.
-        """
-        self.popularity_measure = new_popularity_measure
-
     def fit(self, x: pd.DataFrame,
             y: Optional[pd.DataFrame] = None, **fit_params):
 
@@ -79,12 +72,12 @@ class OurMethod(Method):
 
         if self.embedding_model is None:
             assert self.embedding_name in x.columns, \
-                ("When no embedding model provided, input DataFrame should "
-                 + "contain column named same as `embedding_name`.")
+                "When no embedding model provided, input DataFrame should " \
+                "contain column named same as `embedding_name`."
         else:
             assert 'lemmas' in x.columns, \
-                ("When embedding model is provided input DataFrame should "
-                 + "contain column 'lemmas'.")
+                "When embedding model is provided input DataFrame should " \
+                "contain column 'lemmas'."
 
         x = x[x['hashtags'].str.len() > 0]
         if self.verbose:
@@ -109,17 +102,19 @@ class OurMethod(Method):
             print(f"Dropped: {count_before - len(x)} rows.")
         if self.verbose:
             print('Building Graph')
-        g = self._build_base_graph(x)
+        self._G = self._build_base_graph(x)
 
         if self.verbose:
-            print('Calculating hashtag embeddings.')
-        g = self._calculate_hashtag_embeddings(g)
+            print('Aggregating hashtag embeddings and mean retweets.')
+        self._calculate_hashtag_embeddings_and_mean_retweets()
 
         if self.verbose:
-            print('Calculating popularity measures.')
-        g = self._calculate_hashtag_mean_retweets(g)
-        g = self._calculate_edge_weights(g)
-        self._G = self._calculate_pagerank(g)
+            print('Calculating PageRank.')
+        self._calculate_pagerank()
+
+        if self.verbose:
+            print('Calculating edge weights.')
+        self._calculate_edge_weights()
 
         hashtags = [{'hashtag': node, **self._G.nodes[node]}
                     for node in self._G.nodes
@@ -176,7 +171,6 @@ class OurMethod(Method):
 
         pop = self._hashtags_df[self.popularity_measure].to_numpy()
         pop = self.normalise(pop)
-        print(sim.shape, pop.shape)
         sim_pop = ((1 - self.ratio) * sim + (self.ratio * pop))
         result = []
         if self.verbose:
@@ -214,16 +208,16 @@ class OurMethod(Method):
         G = nx.Graph()
 
         def add_row_to_graph(row, graph, embedding_name):
-            if len(row.hashtags) > 0:
-                graph.add_node(row.id)
-                graph.node[row.id]["node_type"] = "tweet"
-                graph.node[row.id]["retweets"] = row.retweet_count
-                graph.node[row.id][embedding_name] = row[embedding_name]
+            if len(row["hashtags"]) > 0:
+                graph.add_node(row['id'])
+                graph.node[row["id"]]["node_type"] = "tweet"
+                graph.node[row["id"]]["retweets"] = row["retweet_count"]
+                graph.node[row["id"]][embedding_name] = row[embedding_name]
 
                 for hashtag in row.hashtags:
                     graph.add_node(hashtag)
                     graph.node[hashtag]["node_type"] = "hashtag"
-                    graph.add_edge(row.id, hashtag)
+                    graph.add_edge(row["id"], hashtag)
 
         if self.verbose:
             print("Building graph ...")
@@ -236,51 +230,39 @@ class OurMethod(Method):
                          axis=1)
         return G
 
-    def _calculate_hashtag_embeddings(self, G: nx.Graph):
+    def _calculate_hashtag_embeddings_and_mean_retweets(self):
 
-        for node in tqdm.tqdm(G.nodes, total=len(G.nodes),
+        for node in tqdm.tqdm(self._G.nodes, total=len(self._G.nodes),
                               disable=not self.verbose):
-            if G.nodes[node]["node_type"] == "hashtag":
-                tweets = list(G.neighbors(node))
-                embeddings = np.asarray([G.nodes[tweet][self.embedding_name]
-                                         for tweet in tweets])
-                G.nodes[node][self.embedding_name] = embeddings.mean(axis=0)
+            if self._G.nodes[node]["node_type"] == "hashtag":
+                embeddings, retweets_counts = [], []
+                for neighbour in self._G.neighbors(node):
+                    tweet = self._G.nodes[neighbour]
+                    embeddings.append(tweet[self.embedding_name])
+                    retweets_counts.append(tweet['retweets'])
 
-        return G
+                # hashtag embeddings
+                embeddings = np.asarray(embeddings)
+                self._G.nodes[node][self.embedding_name] = embeddings.mean(0)
+                # mean retweets
+                retweets_counts = np.asarray(retweets_counts)
+                self._G.nodes[node]['mean_retweets'] = retweets_counts.mean(0)
 
-    def _calculate_pagerank(self, G: nx.Graph):
-        graph_pagerank = nx.pagerank(G)
-        nx.set_node_attributes(G, graph_pagerank, "pagerank")
-        return G
+    def _calculate_pagerank(self):
+        graph_pagerank = nx.pagerank(self._G)
+        nx.set_node_attributes(self._G, graph_pagerank, "pagerank")
 
-    def _calculate_hashtag_mean_retweets(self, G: nx.Graph):
-        for node in tqdm.tqdm(G.nodes, total=len(G.nodes),
-                              disable=not self.verbose):
-            if G.nodes[node]["node_type"] == "hashtag":
-                tweets = G.neighbors(node)
-                retweets_counts = np.asarray([G.nodes[tweet]['retweets']
-                                              for tweet in tweets])
-                G.nodes[node]['mean_retweets'] = retweets_counts.mean(axis=0)
-        return G
-
-    def _calculate_edge_weights(self, G: nx.Graph,
-                                distance_name: str = 'distance',
+    def _calculate_edge_weights(self, distance_name: str = 'distance',
                                 similarity_name: str = 'similarity'):
-        for (node_from,
-             node_to, edge_features) in tqdm.tqdm(G.edges(data=True),
-                                                  total=len(G.edges),
-                                                  disable=not self.verbose):
-            emb_from = G.nodes[node_from][self.embedding_name]
-            emb_to = G.nodes[node_to][self.embedding_name]
+        for (node_from, node_to,
+             edge_features) in tqdm.tqdm(self._G.edges(data=True),
+                                         total=len(self._G.edges),
+                                         disable=not self.verbose):
+            emb_from = self._G.nodes[node_from][self.embedding_name]
+            emb_to = self._G.nodes[node_to][self.embedding_name]
 
-            # clipping to avoid numerical errors
-            distance = np.clip(scipy.spatial.distance.cosine(emb_from, emb_to),
-                               0, 1)
-            similarity = 1 - distance
-            ang_dist = np.arccos(similarity) / np.pi
-            ang_sim = 1 - ang_dist
+            sim = self.embedding_similarity(emb_from.reshape(1, -1),
+                                            emb_to.reshape(1, -1)).item()
 
-            edge_features[distance_name] = ang_dist
-            edge_features[similarity_name] = ang_sim
-
-        return G
+            edge_features[distance_name] = 1 - sim
+            edge_features[similarity_name] = sim

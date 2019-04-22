@@ -15,13 +15,11 @@ our = OurMethod(0.0, path_to_keyedvectors_model=args.w2v_path, popularity_measur
 our.fit(tweets_with_lemmas, min_hashtag_count=10)
 
 print("Predicting ... ")
-print(our.transform([["wieźć", "szwagier", "na", "wybory"]]))
-print(our.transform(["Wiozę szwagra na wybory"]))
-print(our.transform([
-    "Co by tu dzisiaj zrobić ...",
-    "Wiozę szwagra na wybory"
-]))
-print(our.transform([
-    ["co", "by", "tu", "dzisiaj", "zrobić", "..."],
-    ["wieźć", "szwagier", "na", "wybory"]
-]))
+print(our.transform([["wieźć", "szwagier", "na", "wybory"]])[0][:10])
+print(our.transform(["Wiozę szwagra na wybory"])[0][:10])
+print([res[:10] for res in our.transform(["Co by tu dzisiaj zrobić ...",
+                                         "Wiozę szwagra na wybory"
+                                         ])])
+print([res[:10] for res
+       in our.transform([["co", "by", "tu", "dzisiaj", "zrobić", "..."],
+                         ["wieźć", "szwagier", "na", "wybory"]])])
