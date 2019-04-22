@@ -73,7 +73,7 @@ class OurMethod(Method):
         if self.embedding_model is None:
             assert self.embedding_name in x.columns, \
                 "When no embedding model provided, input DataFrame should " \
-                "contain column named same as `self.embedding_name`."
+                f"contain column named same as `{self.embedding_name}`."
         else:
             assert "lemmas" in x.columns, \
                 "When embedding model is provided input DataFrame should " \
