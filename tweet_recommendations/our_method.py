@@ -37,8 +37,8 @@ class OurMethod(Method):
         :param path_to_keyedvectors_model: Optional argument. Path to `gensim`
                 model converted by script `convert_embedding_model_to_mmap.py`.
                 It can be either word2vec or fasttext, `gensim` handles both.
-                When path isn"t set, `embedding_name` argument is required.
-                Also `fit` and `transform` won"t accept text input and will
+                When path isn't set, `embedding_name` argument is required.
+                Also `fit` and `transform` won't accept text input and will
                 have to contain column named the same as `embedding_name`.
                 You will have to provide precomputed embeddings.
         :param embedding_name: Optional, name of used embedding method.
@@ -170,14 +170,12 @@ class OurMethod(Method):
 
         pop = self._hashtags_df[self.popularity_measure].to_numpy()
         pop = self.normalise(pop.reshape(1, -1))
-        
+
         sim_pop = ((1 - self.ratio) * sim + (self.ratio * pop))
-        result = []
         if self.verbose:
             print("Calculating ranking.")
-        for i in tqdm.tqdm(range(len(x)), disable=not self.verbose):
-            ranking = np.argsort(-sim_pop[i, :])
-            result.append(list(self._hashtags_df["hashtag"].iloc[ranking]))
+        rankings = np.argsort(-sim_pop, axis=1)
+        result = self._hashtags_df["hashtag"].to_numpy()[rankings].tolist()
         return result
 
     def normalise(self, array: np.ndarray):
@@ -220,7 +218,6 @@ class OurMethod(Method):
                     graph.add_edge(row["id"], hashtag)
 
         if self.verbose:
-            print("Building graph ...")
             tqdm.tqdm.pandas()
             tweets.progress_apply(lambda r:
                                   add_row_to_graph(r, G, self.embedding_name),
