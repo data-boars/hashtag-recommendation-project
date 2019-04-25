@@ -5,11 +5,13 @@ import dask.dataframe as dd
 import spacy
 
 SPACY_MODEL_NAME = "en_core_web_md"
+SPACY_DISABLED_PIPELINE = ["parser", "ner"]
+SPACY_STEM_ONLY_DISABLED_PIPELINE = ["parser", "ner", "tagger"]
 SPACE = " "
 
 
 def preprocess_dataset(
-    dataset_path: str, target_path: str, verbose: bool = False, column: str = "Text"
+    dataset_path: str, target_path: str, verbose: bool = False, column: str = "Text", stem_only: bool = False
 ) -> None:
     """
     Preprocess dataset:
@@ -21,7 +23,12 @@ def preprocess_dataset(
     :param verbose: show `dask`'s progress bar
     :param column: column name containing text in CSV file
     """
-    nlp = spacy.load(SPACY_MODEL_NAME)
+    if stem_only:
+        disabled_components = SPACY_STEM_ONLY_DISABLED_PIPELINE
+    else:
+        disabled_components = SPACY_DISABLED_PIPELINE
+
+    nlp = spacy.load(SPACY_MODEL_NAME, disable=disabled_components)
     dataset_path = Path(dataset_path) / "*.csv"
 
     def clear_tweet(row):
@@ -38,7 +45,6 @@ def preprocess_dataset(
 
     if verbose:
         from dask.diagnostics import ProgressBar
-
         ProgressBar().register()
 
     dataset = dd.read_csv(dataset_path)
@@ -63,7 +69,16 @@ if __name__ == "__main__":
         ),
         default="Text",
     )
+    parser.add_argument(
+        "--stem-only",
+        "-s",
+        action="store_true",
+        help=(
+            "Disables tagging module, resulting",
+            "in stemming instead of lemmatization process"
+        ),
+    )
 
     args = parser.parse_args()
 
-    preprocess_dataset(args.input_path, args.output_path, args.verbose, args.column)
+    preprocess_dataset(args.input_path, args.output_path, args.verbose, args.column, args.stem_only)
