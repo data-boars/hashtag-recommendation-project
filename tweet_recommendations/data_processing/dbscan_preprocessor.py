@@ -2,7 +2,10 @@ import argparse
 from pathlib import Path
 
 import dask.dataframe as dd
+import dask.multiprocessing
 import spacy
+
+dask.config.set(scheduler="processes")
 
 SPACY_MODEL_NAME = "en_core_web_md"
 SPACY_DISABLED_PIPELINE = ["parser", "ner"]
@@ -11,7 +14,11 @@ SPACE = " "
 
 
 def preprocess_dataset(
-    dataset_path: str, target_path: str, verbose: bool = False, column: str = "Text", stem_only: bool = False
+    dataset_path: str,
+    target_path: str,
+    verbose: bool = False,
+    column: str = "Text",
+    stem_only: bool = False,
 ) -> None:
     """
     Preprocess dataset:
@@ -28,8 +35,13 @@ def preprocess_dataset(
     else:
         disabled_components = SPACY_DISABLED_PIPELINE
 
+    if verbose:
+        print(
+            f"Loading model {SPACY_MODEL_NAME}, disabled components: {disabled_components}"
+        )
+
     nlp = spacy.load(SPACY_MODEL_NAME, disable=disabled_components)
-    dataset_path = Path(dataset_path) / "*.csv"
+    dataset_path = Path(dataset_path)
 
     def clear_tweet(row):
         raw_text = str(row[column])
@@ -44,11 +56,21 @@ def preprocess_dataset(
         return row
 
     if verbose:
-        from dask.diagnostics import ProgressBar
-        ProgressBar().register()
+        print(f"Reading input file from {dataset_path}")
 
     dataset = dd.read_csv(dataset_path)
+
+    if verbose:
+        from dask.diagnostics import ProgressBar
+
+        ProgressBar().register()
+        print("Beginning preprocessing")
+
     dataset = dataset.apply(clear_tweet, axis=1).compute()
+
+    if verbose:
+        print(f"Saving preprocessed dataset as {target_path}")
+
     dataset.to_csv(target_path)
 
 
@@ -63,10 +85,7 @@ if __name__ == "__main__":
         "--column",
         "-c",
         type=str,
-        help=(
-            "Column containing text in CSV file, ",
-            "Default: Text (as in UDI dataset)",
-        ),
+        help=("Column containing text in CSV file, Default: Text (as in UDI dataset)"),
         default="Text",
     )
     parser.add_argument(
@@ -74,11 +93,13 @@ if __name__ == "__main__":
         "-s",
         action="store_true",
         help=(
-            "Disables tagging module, resulting",
+            "Disables tagging module, resulting"
             "in stemming instead of lemmatization process"
         ),
     )
 
     args = parser.parse_args()
 
-    preprocess_dataset(args.input_path, args.output_path, args.verbose, args.column, args.stem_only)
+    preprocess_dataset(
+        args.input_path, args.output_path, args.verbose, args.column, args.stem_only
+    )
