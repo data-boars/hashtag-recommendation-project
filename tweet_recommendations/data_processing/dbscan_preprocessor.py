@@ -2,15 +2,15 @@ import argparse
 from pathlib import Path
 
 import dask.dataframe as dd
-import dask.multiprocessing
 import spacy
-
-dask.config.set(scheduler="processes")
 
 SPACY_MODEL_NAME = "en_core_web_md"
 SPACY_DISABLED_PIPELINE = ["parser", "ner"]
 SPACY_STEM_ONLY_DISABLED_PIPELINE = ["parser", "ner", "tagger"]
 SPACE = " "
+SCHEDULING_AUTO = "auto"
+SCHEDULING_THREADS = "threads"
+SCHEDULING_MULTIPROCESSING = "multiprocessing"
 
 
 def preprocess_dataset(
@@ -19,6 +19,7 @@ def preprocess_dataset(
     verbose: bool = False,
     column: str = "Text",
     stem_only: bool = False,
+    scheduling: str = SCHEDULING_AUTO,
 ) -> None:
     """
     Preprocess dataset:
@@ -30,6 +31,15 @@ def preprocess_dataset(
     :param verbose: show `dask`'s progress bar
     :param column: column name containing text in CSV file
     """
+    if scheduling == SCHEDULING_THREADS:
+        import dask
+
+        dask.config.set(scheduler="threads")
+    elif scheduling == SCHEDULING_MULTIPROCESSING:
+        import dask.multiprocessing
+
+        dask.config.set(scheduler="processes")
+
     if stem_only:
         disabled_components = SPACY_STEM_ONLY_DISABLED_PIPELINE
     else:
@@ -64,6 +74,7 @@ def preprocess_dataset(
         from dask.diagnostics import ProgressBar
 
         ProgressBar().register()
+
         print("Beginning preprocessing")
 
     dataset = dataset.apply(clear_tweet, axis=1).compute()
@@ -97,9 +108,20 @@ if __name__ == "__main__":
             "in stemming instead of lemmatization process"
         ),
     )
+    parser.add_argument(
+        "--scheduling",
+        choices=[SCHEDULING_AUTO, SCHEDULING_THREADS, SCHEDULING_MULTIPROCESSING],
+        help=f"Specify dask's scheduling mode. Default is {SCHEDULING_AUTO}",
+        default=SCHEDULING_AUTO,
+    )
 
     args = parser.parse_args()
 
     preprocess_dataset(
-        args.input_path, args.output_path, args.verbose, args.column, args.stem_only
+        args.input_path,
+        args.output_path,
+        args.verbose,
+        args.column,
+        args.stem_only,
+        args.scheduling,
     )
