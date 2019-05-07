@@ -23,6 +23,8 @@ class OurMethod(Method):
                  popularity_measure: PopularityMeasure = "pagerank",
                  path_to_keyedvectors_model: Optional[str] = None,
                  embedding_name: Optional[str] = "embedding",
+                 personalised_pagerank: bool = True,
+                 weighted_pagerank: bool = True,
                  verbose: bool = False):
         """
         Our proposed hashtag recommendation method.
@@ -47,6 +49,11 @@ class OurMethod(Method):
                 named the same as value provided to this argument.
                 If `path_to_keyedvectors_model` is provided `embedding_name`
                 is ignored and is just used as a name.
+        :param personalised_pagerank: Whether to use tweet retweets and hashtag
+                mean retweets as personalisation vector in PageRank algorithm.
+                Default is `True`.
+        :param weighted_pagerank: Whether to use tweet-hashtag embedding
+                similarity as weights in PageRank algorithm. Default is `True`.
         :param verbose: Whether method should be verbose.
         """
 
@@ -55,6 +62,9 @@ class OurMethod(Method):
         self.ratio = popularity_to_similarity_ratio
         self.popularity_measure = PopularityMeasure(popularity_measure).value
         self.embedding_name = embedding_name
+
+        self._weighted_pagerank = weighted_pagerank
+        self._personalised_pagerank = personalised_pagerank
 
         self.embedding_model = None
         if path_to_keyedvectors_model is not None:
@@ -109,12 +119,12 @@ class OurMethod(Method):
         self._calculate_hashtag_embeddings_and_mean_retweets()
 
         if self.verbose:
-            print("Calculating PageRank.")
-        self._calculate_pagerank()
-
-        if self.verbose:
             print("Calculating edge weights.")
         self._calculate_edge_weights()
+
+        if self.verbose:
+            print("Calculating PageRank.")
+        self._calculate_pagerank()
 
         hashtags = [{"hashtag": node, **self._G.nodes[node]}
                     for node in self._G.nodes
@@ -178,12 +188,14 @@ class OurMethod(Method):
         result = self._hashtags_df["hashtag"].to_numpy()[rankings].tolist()
         return result
 
-    def normalise(self, array: np.ndarray):
+    @staticmethod
+    def normalise(array: np.ndarray):
         array = array - array.min(axis=1).reshape(-1, 1)
         array = array / (array.max(axis=1).reshape(-1, 1) + 1e-18)
         return array
 
-    def embedding_similarity(self, x: np.ndarray, y: np.ndarray):
+    @staticmethod
+    def embedding_similarity(x: np.ndarray, y: np.ndarray):
         """
         Computes angular similarity based on cosine similarity.
         https://en.wikipedia.org/wiki/Cosine_similarity#Angular_distance_and_similarity
@@ -246,11 +258,24 @@ class OurMethod(Method):
                 self._G.nodes[node]["mean_retweets"] = retweets_counts.mean(0)
 
     def _calculate_pagerank(self):
-        graph_pagerank = nx.pagerank(self._G)
+        edge_weight_key = "similarity" if self._weighted_pagerank else None
+
+        if self._personalised_pagerank:
+            pers_vector = dict()
+            for node, attributes in self._G.nodes.data():
+                if attributes["node_type"] == "hashtag":
+                    pers_vector[node] = attributes["mean_retweets"] + 1
+                else:
+                    pers_vector[node] = attributes["retweets"] + 1
+        else:
+            pers_vector = None
+
+        graph_pagerank = nx.pagerank(self._G,
+                                     weight=edge_weight_key,
+                                     personalization=pers_vector)
         nx.set_node_attributes(self._G, graph_pagerank, "pagerank")
 
-    def _calculate_edge_weights(self, distance_name: str = "distance",
-                                similarity_name: str = "similarity"):
+    def _calculate_edge_weights(self):
         for (node_from, node_to,
              edge_features) in tqdm.tqdm(self._G.edges(data=True),
                                          total=len(self._G.edges),
@@ -261,5 +286,5 @@ class OurMethod(Method):
             sim = self.embedding_similarity(emb_from.reshape(1, -1),
                                             emb_to.reshape(1, -1)).item()
 
-            edge_features[distance_name] = 1 - sim
-            edge_features[similarity_name] = sim
+            edge_features["distance"] = 1 - sim
+            edge_features["similarity"] = sim
