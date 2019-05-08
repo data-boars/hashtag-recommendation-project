@@ -19,7 +19,7 @@ MIN_SAMPLES = 1
 
 
 class DBScanBasedEstimator(Method):
-    def __init__(self, path_to_keyedvectors_model: str, verbose: bool = False):
+    def __init__(self, path_to_keyedvectors_model: Optional[str] = None, verbose: bool = False):
         """
         Hashtag recommendation method implementation based on https://bit.ly/2V3tnWX.
         :param path_to_keyedvectors_model: Path to converted by script `convert_embedding_model_to_mmap.py` gensim
@@ -29,7 +29,7 @@ class DBScanBasedEstimator(Method):
         self._clusters: np.ndarray = None
 
         self.clusterizer = None
-        self.sif_embedding = SIFEmbedding(path_to_keyedvectors_model, verbose)
+        self.sif_embedding = SIFEmbedding(path_to_keyedvectors_model, verbose=verbose)
         self.neighbours = None
         self._centroids_data = []
         self._corresponding_to_centroids_data_hashtags = []
