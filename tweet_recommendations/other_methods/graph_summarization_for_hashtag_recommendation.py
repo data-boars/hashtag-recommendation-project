@@ -58,7 +58,7 @@ class GraphSummarizationMethod(Method):
         :return: None.
         """
         user_name = row["username"] + "_user"
-        tweet_id = row["id"] + "_tweet"
+        tweet_id = str(row["id"]) + "_tweet"
         tags = row["hashtags"]
 
         self._users_labels.add(user_name)
