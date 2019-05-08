@@ -1,9 +1,7 @@
 import argparse
 
-import numpy as np
 import pandas as pd
 
-from tweet_recommendations.embeddings.sif_embedding import SIFEmbedding
 from tweet_recommendations.other_methods.dbscan_based_method import DBScanBasedEstimator
 
 parser = argparse.ArgumentParser()
