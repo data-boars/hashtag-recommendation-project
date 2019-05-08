@@ -58,7 +58,7 @@ class GraphSummarizationMethod(Method):
         :return: None.
         """
         user_name = row["username"] + "_user"
-        tweet_id = row["id_str"] + "_tweet"
+        tweet_id = str(row["id"]) + "_tweet"
         tags = row["hashtags"]
 
         self._users_labels.add(user_name)
@@ -206,7 +206,7 @@ class GraphSummarizationMethod(Method):
             query_hashtags = [query_hashtags] * len(lemmatised)
 
         # as in fit, vectorizer has normalization inside ...
-        tf_idf_vectors = self._hashtags_tf_idf_vectorizer.transform(x)
+        tf_idf_vectors = self._hashtags_tf_idf_vectorizer.transform(lemmatised)
 
         # ... so this simplifies to cosine similarity - no normalisation required
         similarities = self._hashtags_tf_idf_representation.dot(tf_idf_vectors.T).T.toarray()
