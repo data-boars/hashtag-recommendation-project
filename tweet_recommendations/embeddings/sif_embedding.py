@@ -14,32 +14,41 @@ from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 
 class SIFEmbedding(Method):
 
-    def __init__(self, path_to_keyedvectors_model: str,
-                 embedding_name: Optional[str] = "embedding",
+    def __init__(self, path_to_keyedvectors_model: Optional[str] = None,
+                 tweet_embedding_name: Optional[str] = "embedding",
+                 words_embeddings_name: Optional[str] = "word_embeddings",
                  verbose: bool = False):
         """
         Method for creating embeddings out of words and combining them into single tweet embedding with modified
         weighted average of those embeddings.
         :param path_to_keyedvectors_model: Path to converted by script `convert_embedding_model_to_mmap.py` gensim
             model. It can either word2vec or fasttext, `gensim` handles both.
-        :param embedding_name: Optional, name of used embedding method.
+        :param tweet_embedding_name: Optional, name of used embedding method.
                 Required when `path_to_keyedvectors_model` is not provided.
                 Input DataFrame in `fit` method will have to contain column
                 named the same as value provided to this argument.
                 If `path_to_keyedvectors_model` is provided `embedding_name`
                 is ignored and is just used as a name.
+        :param words_embeddings_name: Optional, name of used embedding method.
+                Required when `path_to_keyedvectors_model` is not provided.
+                Input DataFrame in `fit` method will have to contain column
+                named the same as value provided to this argument. Every column
+                element should contain a list of word embedding for a given sentence.
+                If `path_to_keyedvectors_model` is provided `words_embeddings_name`
+                is ignored and is just used as a name.
         :param verbose: Whether method should be verbose.
         """
         self.verbose = verbose
         self.keyed_vector_model = None
-        self.embedding_name = embedding_name
+        self.embedding_name = tweet_embedding_name
+        self.words_embeddings_name = words_embeddings_name
 
-        if self.verbose:
-            if path_to_keyedvectors_model:
+        if path_to_keyedvectors_model:
+            if self.verbose:
                 print("Loading keyed vectors model ...")
-                self.keyed_vector_model = KeyedVectors.load(path_to_keyedvectors_model, mmap="r")
-            else:
-                print("No keyed vector found. \n Embeddings will be acquired from the input data ...")
+            self.keyed_vector_model = KeyedVectors.load(path_to_keyedvectors_model, mmap="r")
+        elif self.verbose:
+            print("No keyed vector found. \n Embeddings will be acquired from the input data ...")
 
         self.words_weights = None
         self._pc = None
@@ -111,13 +120,16 @@ class SIFEmbedding(Method):
         output = self._get_sif_embedding(data)
         return np.asarray(output)
 
-    def _get_weighted_average_embeddings(self, data: pd.DataFrame) -> np.ndarray:
+    def _get_weighted_average_embeddings(self, data: Union[List[List[str]], pd.DataFrame]) -> np.ndarray:
         """
         Compute the weighted average vectors for given tweet content lemmas.
         :param data: DataFrame which should contain tweet text lemmas.
         :return: Weighted average of tweet embeddings.
         """
-        sentences = data["lemmas"].values.tolist()
+        if isinstance(data, pd.DataFrame):
+            sentences = data["lemmas"].values.tolist()
+        else:
+            sentences = data
         n_samples = len(sentences)
         if self.keyed_vector_model:
             embedding_size = self.keyed_vector_model.vector_size
@@ -138,8 +150,8 @@ class SIFEmbedding(Method):
                     except KeyError:
                         continue
                 if not self.keyed_vector_model:
-                    words_embeddings = data["word_embeddings"].iloc[i]
-                sentence_word_embeddings = np.array(words_embeddings)
+                    words_embeddings = data[self.words_embeddings_name].iloc[i]
+                sentence_word_embeddings = np.asarray(words_embeddings)
                 sentence_word_weights = np.array(words_weights)
 
                 if len(sentence_word_weights) > 0:
