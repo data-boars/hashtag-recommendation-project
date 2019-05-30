@@ -1,12 +1,12 @@
-# Anonymous submission
-## Anonymous authors
+# How To Increase Tweets Popularity? Recommending Hashtags with PageRank and Word Embedding Model
+Michał Kosturek, Kacper Kania, Jakub Michałowski, Jakub Cwynar, Arkadiusz Janz
 
 ---
 
 ## Overview
 
 This repository contains supplemental material for 
-the article [REDACTED], submitted to [REDACTED]. It contains implementations of introduced method, as well as baseline methods used as reference. All of them are compatible with scikit-learn API. We also share information on how to reconstruct datasets used for experiments.
+the article _How To Increase Tweets Popularity? Recommending Hashtags with PageRank and Word Embedding Model_, submitted to CoNLL 2019. It contains implementations of introduced method, as well as baseline methods used as reference. All of them are compatible with scikit-learn API. We also share information on how to reconstruct datasets used for experiments.
 
 ## Repository structure 
 
@@ -43,4 +43,5 @@ We are not allowed to share the exact datasets that were used for our research -
 The dataset files are available in `data/` directory,
 where every file contains a tweet ID in each line.
 
-For word embeddings, we've used CLARIN-PL FastText models [[online]]( http://hdl.handle.net/11321/606).
+FastText word embeddings were provided by CLARIN-PL:
+- Kocoń, Jan, 2018, KGR10 FastText Polish word embeddings, CLARIN-PL digital repository, http://hdl.handle.net/11321/606.
