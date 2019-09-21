@@ -20,8 +20,6 @@ the_graph.fit(tweets_with_lemmas)
 times = []
 for _ in range(10):
     now = time.time()
-    import ipdb
-    ipdb.set_trace()
     print(
         the_graph.transform(
             (
