@@ -212,7 +212,7 @@ class Tweet2Vec(Method):
 
     def transform(
         self,
-        x: Union[Tuple[Tuple[str, ...]], Tuple[str, ...]],
+        x: Union[Tuple[Tuple[str, ...], ...], Tuple[str, ...]],
         **transform_params
     ) -> np.ndarray:
         # Model

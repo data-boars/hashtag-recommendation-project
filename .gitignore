@@ -358,3 +358,4 @@ $RECYCLE.BIN/
 # End of https://www.gitignore.io/api/vim,macos,linux,python,pycharm,windows,intellij,jupyternotebook,visualstudiocode
 !.md
 models
+data

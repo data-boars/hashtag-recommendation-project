@@ -23,9 +23,9 @@ for _ in range(10):
     print(
         the_graph.transform(
             (
-                ["co", "by", "tu", "dzisiaj", "zrobić"],
-                ["wieźć", "szwagier", "na", "wybory"],
-                ["co", "by", "tu", "dzisiaj", "zrobić"],
+                ("co", "by", "tu", "dzisiaj", "zrobić"),
+                ("wieźć", "szwagier", "na", "wybory"),
+                ("co", "by", "tu", "dzisiaj", "zrobić"),
             )
         )[:, :10]
     )
