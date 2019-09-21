@@ -43,6 +43,7 @@ class Tweet2Vec(Method):
         self.n_classes = None
         self.chardict = None
         self.labeldict = None
+        self.classnum_to_label_map = None
         self.predict = None
         self.encode = None
         self.net = None
@@ -53,11 +54,20 @@ class Tweet2Vec(Method):
         self.targets_input = None
         self.t_mask_input = None
 
+    def _create_classnum_to_label_map(self):
+        self.classnum_to_label_map = np.ndarray(
+            (len(self.labeldict) + 1,), dtype=np.object
+        )
+        for key, index in self.labeldict.items():
+            self.classnum_to_label_map[index] = key
+
     def _load_model(self):
+        self._print("Loading model params...")
         with open((self.model_path / "dict.pkl").as_posix(), "rb") as f:
             self.chardict = pkl.load(f)
         with open((self.model_path / "label_dict.pkl").as_posix(), "rb") as f:
             self.labeldict = pkl.load(f)
+        self._create_classnum_to_label_map()
         self.n_char = len(list(self.chardict.keys())) + 1
         self.n_classes = min(
             len(list(self.labeldict.keys())) + 1, self.max_classes
@@ -165,6 +175,7 @@ class Tweet2Vec(Method):
             labelcount,
             (self.model_path / "label_dict.pkl").as_posix(),
         )
+        self._create_classnum_to_label_map()
 
         self.n_classes = min(
             len(list(self.labeldict.keys())) + 1, self.max_classes
@@ -266,10 +277,12 @@ class Tweet2Vec(Method):
         **transform_params
     ) -> np.ndarray:
         # Model
-        self._print("Loading model params...")
         if self.params is None:
             self._build_network()
             self._load_model()
+
+        if type(x[0]) in [tuple, list, np.ndarray]:
+            x = [" ".join(entry) for entry in x]
 
         # iterators
         test_iter = batch.BatchTweets(
@@ -287,13 +300,15 @@ class Tweet2Vec(Method):
         for xr, y in test_iter:
             x, x_m = batch.prepare_data(xr, self.chardict, n_chars=self.n_char)
             p = self.predict(x, x_m)
-            e = self.encode(x, x_m)
             ranks = np.argsort(p)[:, ::-1]
 
             for idx, item in enumerate(xr):
                 out_pred.append(ranks[idx, :])
 
-        return np.asarray(out_pred)
+        output = np.asarray(out_pred)
+        labels = self.classnum_to_label_map[output]
+
+        return labels
 
     @classmethod
     def _classify(cls, tweet, t_mask, params, n_classes, n_chars):
@@ -343,8 +358,8 @@ class Tweet2Vec(Method):
         for tweet in tweets_lemmas:
             output.append(
                 seq(list(tweet))
-                .filter(lambda char: char in VALID_CHARACTERS)
-                .to_list()
+                    .filter(lambda char: char in VALID_CHARACTERS)
+                    .to_list()
             )
         return output
 
