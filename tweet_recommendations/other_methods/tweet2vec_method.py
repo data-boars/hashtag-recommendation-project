@@ -1,3 +1,8 @@
+"""Provides implementation of adapter for tweet2vec method.
+
+The method descriptions is available at: https://arxiv.org/abs/1605.03481
+The original code is available at: https://github.com/bdhingra/tweet2vec
+"""
 import os
 
 os.environ["THEANO_FLAGS"] = "floatX=float32,device=cuda0"
@@ -25,6 +30,7 @@ VALID_CHARACTERS = (
 
 
 class Tweet2Vec(Method):
+    """Adapter for tweet2vec method in scikit-learn manner."""
     def __init__(
         self,
         epochs: int,
@@ -32,6 +38,23 @@ class Tweet2Vec(Method):
         verbose: bool = False,
         last_epoch: Optional[int] = None,
     ):
+        """Instantiates the class.
+
+        :param epochs: Number of epochs that the model will be trained for once
+            the `fit` method is called.
+        :param model_path: Path to the folder where all auxiliary files will
+            be saved, such as class mappings, weights etc. If the directory
+            doesn't exists, then it creates one. Also, overwrites all the
+            content in the existing directory during `fit` method. It is used
+            also to load weights from if the directory contains an appropriate
+            file.
+        :param verbose: Whether method should be verbose and print intermediate
+            results.
+        :param last_epoch: Last epoch of training that the learning should
+            be continued from. Also, it used to point a particular file of many
+            that are saved every epoch during epoch. If the value is None or
+            is less then 0, then weights from the last epoch will be loaded.
+        """
         self.model_path = Path(model_path)
         self.epochs = epochs
         self.verbose = verbose
@@ -55,6 +78,7 @@ class Tweet2Vec(Method):
         self.t_mask_input = None
 
     def _create_classnum_to_label_map(self):
+        """Create mapping from an index to a label (hashtag)."""
         self.classnum_to_label_map = np.ndarray(
             (len(self.labeldict) + 1,), dtype=np.object
         )
@@ -62,6 +86,14 @@ class Tweet2Vec(Method):
             self.classnum_to_label_map[index] = key
 
     def _load_model(self):
+        """Load all necessary data so the model can work properly.
+
+        This includes weights of the model, a dict with mapping from a single
+        character to its class and a dict with mappings from hashtags to
+        appropriate intiger classes. If the `last_epoch` is provided, then
+        weights from file `model_{last_epochs}.npz` are loaded from the given
+        model directory.
+        """
         self._print("Loading model params...")
         with open((self.model_path / "dict.pkl").as_posix(), "rb") as f:
             self.chardict = pkl.load(f)
@@ -82,6 +114,7 @@ class Tweet2Vec(Method):
             self.params = t2v.load_params(self._get_last_model().as_posix())
 
     def _build_network(self):
+        """Build network, including inputs, weights and the whole structure."""
         # Tweet variables
         self.tweet_input = T.itensor3()
         self.targets_input = T.ivector()
@@ -149,6 +182,20 @@ class Tweet2Vec(Method):
     def fit(
         self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params
     ) -> "Method":
+        """Fit parameters of the method.
+
+        It creates a directory where files will be saved, preprocesses
+        dataset appropriately, builds the network and fits parameters of that
+        network. All the intermediate results are saved in the given in the
+        constructor path. The method can be stopped with Ctrl+C combination -
+        then the program execution will proceed further.
+        :param x: Frame containing lemmas under 'lemmas' key, where a single
+            entry is a list of lemmas. It must contain a key 'hashtags' with
+            ground truth hashtags, as a list list of dicts.
+        :param y: None, needed for a compatibility.
+        :param fit_params: Additional parameters for the network.
+        :return: self.
+        """
         self._print("Building Model...")
         if not self.model_path.exists():
             self.model_path.mkdir(parents=True, exist_ok=True)
@@ -276,6 +323,18 @@ class Tweet2Vec(Method):
         x: Union[Tuple[Tuple[str, ...], ...], Tuple[str, ...]],
         **transform_params
     ) -> np.ndarray:
+        """Predict most appropriate hashtags for each entry hashtag.
+
+        If the model was not fit before this call, then the model is loaded
+        from a given in the constructor path.
+        :param x: List of tweets contents or list of lists, where each sublist
+            contains single words. The words should be lemmas but the method
+            works fine without it.
+        :param transform_params: Additional transformation parameters for the
+            method.
+        :return: 2D numpy array of predicted hashtags, sorted from the most
+            probable to the least probable for each entry tweet.
+        """
         # Model
         if self.params is None:
             self._build_network()
@@ -312,6 +371,7 @@ class Tweet2Vec(Method):
 
     @classmethod
     def _classify(cls, tweet, t_mask, params, n_classes, n_chars):
+        """Create further model parameters - the head of the network."""
         # tweet embedding
         emb_layer = t2v.tweet2vec(tweet, t_mask, params, n_chars)
         # Dense layer for classes
@@ -334,6 +394,11 @@ class Tweet2Vec(Method):
             print(msg)
 
     def _get_last_model(self) -> Path:
+        """Find the last trained model from a given directory.
+
+        Assumes that there are multiple models that were saved during training
+        process.
+        """
         def _get_value(path: Path):
             name = path.with_suffix("").name
             epoch = int(name.split("_")[-1])
@@ -347,6 +412,7 @@ class Tweet2Vec(Method):
     def _extract_hashtags(
         cls, original_frame: pd.DataFrame
     ) -> List[List[str]]:
+        """Extract hashtags from nested structure of ground truth data."""
         return [
             [tag["text"] for tag in entry]
             for entry in original_frame["hashtags"]
@@ -354,6 +420,12 @@ class Tweet2Vec(Method):
 
     @classmethod
     def _preprocess_lemmas(cls, tweets_lemmas: List[str]) -> List[str]:
+        """Filter tweets' contents so it contains reasonable chars.
+
+        The method casts each char in the tweet to a one hot vector. Since
+        the original lemmas can contain emojis, which are abundant, the method
+        would produce huge vectors without this filtering.
+        """
         output = []
         for tweet in tweets_lemmas:
             output.append(
@@ -367,6 +439,12 @@ class Tweet2Vec(Method):
     def _split_multiple_tags_to_separate_entries(
         cls, lemmas: List[str], tags: List[List[str]]
     ) -> Tuple[List[str], List[str]]:
+        """Repeat tweets with multiple tags and assign each tag to separate.
+
+        The method assumes that for each entry there is a one tag only.
+        Otherwise, it would be hard to define output of the network, since
+        we want to use softmax activation function in the end.
+        """
         new_x = []
         new_y = []
         for x_sample, y_sample in zip(lemmas, tags):
