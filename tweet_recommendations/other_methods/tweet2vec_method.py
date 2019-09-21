@@ -173,9 +173,6 @@ class Tweet2Vec(Method):
                         )
                         uidx -= 1
                         continue
-                    import ipdb
-
-                    ipdb.set_trace()
 
                     curr_cost = train(x, x_m, y)
                     train_cost += curr_cost * len(xr)
