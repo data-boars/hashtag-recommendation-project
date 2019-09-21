@@ -1,6 +1,6 @@
 import os
 
-os.environ["THEANO_FLAGS"] = "floatX=float32,device=cpu"
+os.environ["THEANO_FLAGS"] = "floatX=float32,device=cuda0"
 
 import pickle as pkl
 import string
@@ -37,11 +37,111 @@ class Tweet2Vec(Method):
         self.verbose = verbose
         self.max_classes = 999999
         self.last_epoch = last_epoch
+        self.params = None
+
+        self.n_char = None
+        self.n_classes = None
+        self.chardict = None
+        self.labeldict = None
+        self.predict = None
+        self.encode = None
+        self.net = None
+        self.train = None
+        self.cost_val = None
+
+        self.tweet_input = None
+        self.targets_input = None
+        self.t_mask_input = None
+
+    def _load_model(self):
+        with open((self.model_path / "dict.pkl").as_posix(), "rb") as f:
+            self.chardict = pkl.load(f)
+        with open((self.model_path / "label_dict.pkl").as_posix(), "rb") as f:
+            self.labeldict = pkl.load(f)
+        self.n_char = len(list(self.chardict.keys())) + 1
+        self.n_classes = min(
+            len(list(self.labeldict.keys())) + 1, self.max_classes
+        )
+        if self.last_epoch is not None:
+            self.params = t2v.load_params(
+                (
+                    self.model_path / "model_{}.npz".format(self.last_epoch)
+                ).as_posix()
+            )
+        else:
+            self.params = t2v.load_params(self._get_last_model().as_posix())
+
+    def _build_network(self):
+        # Tweet variables
+        self.tweet_input = T.itensor3()
+        self.targets_input = T.ivector()
+        self.t_mask_input = T.fmatrix()
+
+        self.params = t2v.init_params(n_chars=self.n_char)
+        # classification params
+        self.params["W_cl"] = theano.shared(
+            np.random.normal(
+                loc=0.,
+                scale=settings_char.SCALE,
+                size=(settings_char.WDIM, self.n_classes),
+            ).astype("float32"),
+            name="W_cl",
+        )
+        self.params["b_cl"] = theano.shared(
+            np.zeros((self.n_classes,)).astype("float32"), name="b_cl"
+        )
+        # network for prediction
+        predictions, net, embeddings = self._classify(
+            self.tweet_input,
+            self.t_mask_input,
+            self.params,
+            self.n_classes,
+            self.n_char,
+        )
+
+        # Theano function
+        self._print("Compiling theano functions...")
+        self.predict = theano.function(
+            [self.tweet_input, self.t_mask_input], predictions
+        )
+        self.encode = theano.function(
+            [self.tweet_input, self.t_mask_input], embeddings
+        )
+        self.net = net
+        self._print("Building network...")
+
+        # batch loss
+        loss = lasagne.objectives.categorical_crossentropy(
+            predictions, self.targets_input
+        )
+        cost = T.mean(
+            loss
+        ) + settings_char.REGULARIZATION * lasagne.regularization.regularize_network_params(
+            self.net, lasagne.regularization.l2
+        )
+        cost_only = T.mean(loss)
+
+        # params and updates
+        self._print("Computing updates...")
+        lr = settings_char.LEARNING_RATE
+        mu = settings_char.MOMENTUM
+        updates = lasagne.updates.nesterov_momentum(
+            cost, lasagne.layers.get_all_params(self.net), lr, momentum=mu
+        )
+
+        # Theano function
+        self._print("Compiling theano functions...")
+
+        inps = [self.tweet_input, self.t_mask_input, self.targets_input]
+        self.cost_val = theano.function(inps, [cost_only, embeddings])
+        self.train = theano.function(inps, cost, updates=updates)
 
     def fit(
         self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params
     ) -> "Method":
         self._print("Building Model...")
+        if not self.model_path.exists():
+            self.model_path.mkdir(parents=True, exist_ok=True)
 
         if y is None:
             y = self._extract_hashtags(x)
@@ -52,108 +152,39 @@ class Tweet2Vec(Method):
         Xt = self._preprocess_lemmas(Xt)
         Xt, y = self._split_multiple_tags_to_separate_entries(Xt, y)
 
-        if self.model_path.exists():
-            self._print("Loading model params...")
-            params = t2v.load_params_shared(
-                (self.model_path / "model.npz").as_posix()
-            )
+        # Build dictionaries from training data
+        self.chardict, charcount = batch.build_dictionary(Xt)
+        self.n_char = len(list(self.chardict.keys())) + 1
+        batch.save_dictionary(
+            self.chardict, charcount, (self.model_path / "dict.pkl").as_posix()
+        )
 
-            self._print("Loading dictionaries...")
-            with open((self.model_path / "dict.pkl").as_posix(), "rb") as f:
-                chardict = pkl.load(f)
-            with open(
-                (self.model_path / "label_dict.pkl").as_posix(), "rb"
-            ) as f:
-                labeldict = pkl.load(f)
-            n_char = len(list(chardict.keys())) + 1
-            n_classes = min(len(list(labeldict.keys())) + 1, self.max_classes)
+        self.labeldict, labelcount = batch.build_label_dictionary(y)
+        batch.save_dictionary(
+            self.labeldict,
+            labelcount,
+            (self.model_path / "label_dict.pkl").as_posix(),
+        )
 
-        else:
-            # Build dictionaries from training data
-            self.model_path.mkdir(parents=True)
-            chardict, charcount = batch.build_dictionary(Xt)
-            n_char = len(list(chardict.keys())) + 1
-            batch.save_dictionary(
-                chardict, charcount, (self.model_path / "dict.pkl").as_posix()
-            )
-            # params
-            params = t2v.init_params(n_chars=n_char)
+        self.n_classes = min(
+            len(list(self.labeldict.keys())) + 1, self.max_classes
+        )
 
-            labeldict, labelcount = batch.build_label_dictionary(y)
-            batch.save_dictionary(
-                labeldict,
-                labelcount,
-                (self.model_path / "label_dict.pkl").as_posix(),
-            )
-
-            n_classes = min(len(list(labeldict.keys())) + 1, self.max_classes)
-
-            # classification params
-            params["W_cl"] = theano.shared(
-                np.random.normal(
-                    loc=0.,
-                    scale=settings_char.SCALE,
-                    size=(settings_char.WDIM, n_classes),
-                ).astype("float32"),
-                name="W_cl",
-            )
-            params["b_cl"] = theano.shared(
-                np.zeros((n_classes,)).astype("float32"), name="b_cl"
-            )
+        self._build_network()
+        if self.last_epoch >= 0:
+            self._load_model()
 
         # iterators
         train_iter = batch.BatchTweets(
             Xt,
             y,
-            labeldict,
+            self.labeldict,
             batch_size=settings_char.N_BATCH,
             max_classes=self.max_classes,
         )
 
         self._print("Building network...")
-        # Tweet variables
-        tweet = T.itensor3()
-        targets = T.ivector()
-        # masks
-        t_mask = T.fmatrix()
-
-        # network for prediction
-        predictions, net, emb = self._classify(
-            tweet, t_mask, params, n_classes, n_char
-        )
-
         # batch loss
-        loss = lasagne.objectives.categorical_crossentropy(
-            predictions, targets
-        )
-        cost = T.mean(
-            loss
-        ) + settings_char.REGULARIZATION * lasagne.regularization.regularize_network_params(
-            net, lasagne.regularization.l2
-        )
-        cost_only = T.mean(loss)
-        reg_only = (
-            settings_char.REGULARIZATION
-            * lasagne.regularization.regularize_network_params(
-            net, lasagne.regularization.l2
-        )
-        )
-
-        # params and updates
-        self._print("Computing updates...")
-        lr = settings_char.LEARNING_RATE
-        mu = settings_char.MOMENTUM
-        updates = lasagne.updates.nesterov_momentum(
-            cost, lasagne.layers.get_all_params(net), lr, momentum=mu
-        )
-
-        # Theano function
-        self._print("Compiling theano functions...")
-        inps = [tweet, t_mask, targets]
-        predict = theano.function([tweet, t_mask], predictions)
-        cost_val = theano.function(inps, [cost_only, emb])
-        train = theano.function(inps, cost, updates=updates)
-
         # Training
         self._print("Training...")
         uidx = 0
@@ -166,7 +197,9 @@ class Tweet2Vec(Method):
                 for xr, y in train_iter:
                     n_samples += len(xr)
                     uidx += 1
-                    x, x_m = batch.prepare_data(xr, chardict, n_chars=n_char)
+                    x, x_m = batch.prepare_data(
+                        xr, self.chardict, n_chars=self.n_char
+                    )
                     if x is None:
                         self._print(
                             "Minibatch with zero samples under maxlength."
@@ -174,7 +207,7 @@ class Tweet2Vec(Method):
                         uidx -= 1
                         continue
 
-                    curr_cost = train(x, x_m, y)
+                    curr_cost = self.train(x, x_m, y)
                     train_cost += curr_cost * len(xr)
 
                     if np.isnan(curr_cost) or np.isinf(curr_cost):
@@ -193,7 +226,7 @@ class Tweet2Vec(Method):
                 if np.mod(uidx, settings_char.SAVEF) == 0:
                     self._print("Saving...")
                     saveparams = OrderedDict()
-                    for kk, vv in params.items():
+                    for kk, vv in self.params.items():
                         saveparams[kk] = vv.get_value()
                     np.savez(
                         (self.model_path / "model.npz").as_posix(),
@@ -213,7 +246,7 @@ class Tweet2Vec(Method):
 
                 self._print("Saving...")
                 saveparams = OrderedDict()
-                for kk, vv in params.items():
+                for kk, vv in self.params.items():
                     saveparams[kk] = vv.get_value()
                 np.savez(
                     (
@@ -234,67 +267,32 @@ class Tweet2Vec(Method):
     ) -> np.ndarray:
         # Model
         self._print("Loading model params...")
-        if self.last_epoch is not None:
-            params = t2v.load_params(
-                (
-                    self.model_path / "model_{}.npz".format(self.last_epoch)
-                ).as_posix()
-            )
-        else:
-            params = t2v.load_params(self._get_last_model().as_posix())
-
-        self._print("Loading dictionaries...")
-        with open((self.model_path / "dict.pkl").as_posix(), "rb") as f:
-            chardict = pkl.load(f)
-        with open((self.model_path / "label_dict.pkl").as_posix(), "rb") as f:
-            labeldict = pkl.load(f)
-        n_char = len(list(chardict.keys())) + 1
-        n_classes = min(len(list(labeldict.keys())) + 1, self.max_classes)
+        if self.params is None:
+            self._build_network()
+            self._load_model()
 
         # iterators
         test_iter = batch.BatchTweets(
             x,
             None,
-            labeldict,
+            self.labeldict,
             batch_size=settings_char.N_BATCH,
             max_classes=self.max_classes,
             test=True,
         )
 
-        self._print("Building network...")
-        # Tweet variables
-        tweet = T.itensor3()
-        targets = T.imatrix()
-
-        # masks
-        t_mask = T.fmatrix()
-
-        # network for prediction
-        predictions = self._classify(tweet, t_mask, params, n_classes, n_char)[
-            0
-        ]
-        embeddings = self._classify(tweet, t_mask, params, n_classes, n_char)[
-            1
-        ]
-
-        # Theano function
-        self._print("Compiling theano functions...")
-        predict = theano.function([tweet, t_mask], predictions)
-        encode = theano.function([tweet, t_mask], embeddings)
-
         # Test
         self._print("Testing...")
         out_pred = []
         for xr, y in test_iter:
-            x, x_m = batch.prepare_data(xr, chardict, n_chars=n_char)
-            p = predict(x, x_m)
-            e = encode(x, x_m)
+            x, x_m = batch.prepare_data(xr, self.chardict, n_chars=self.n_char)
+            p = self.predict(x, x_m)
+            e = self.encode(x, x_m)
             ranks = np.argsort(p)[:, ::-1]
 
             for idx, item in enumerate(xr):
                 out_pred.append(ranks[idx, :])
 
-        # Save
         return np.asarray(out_pred)
 
     @classmethod
@@ -345,8 +343,8 @@ class Tweet2Vec(Method):
         for tweet in tweets_lemmas:
             output.append(
                 seq(list(tweet))
-                    .filter(lambda char: char in VALID_CHARACTERS)
-                    .to_list()
+                .filter(lambda char: char in VALID_CHARACTERS)
+                .to_list()
             )
         return output
 
