@@ -1,7 +1,12 @@
+import os
+
+os.environ["THEANO_FLAGS"] = "floatX=float32,device=cpu"
+
 import pickle as pkl
+import string
 from collections import OrderedDict
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import lasagne
 import numpy as np
@@ -12,6 +17,11 @@ from functional import seq
 
 from tweet_recommendations.other_methods.method import Method
 from .tweet2vec.tweet2vec import batch_char as batch, settings_char, t2v
+
+POLISH_CHARACTERS = "ąćęłńóśżź"
+VALID_CHARACTERS = (
+    string.printable + POLISH_CHARACTERS + POLISH_CHARACTERS.upper()
+)
 
 
 class Tweet2Vec(Method):
@@ -31,12 +41,17 @@ class Tweet2Vec(Method):
     def fit(
         self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params
     ) -> "Method":
-        if y is not None:
-            self.max_classes = len(np.unique(y))
+        self._print("Building Model...")
+
+        if y is None:
+            y = self._extract_hashtags(x)
+        self.max_classes = len(np.unique(y))
 
         # Training data
-        Xt = []
-        self._print("Building Model...")
+        Xt = x["lemmas"].apply(lambda a_tweet: " ".join(a_tweet)).tolist()
+        Xt = self._preprocess_lemmas(Xt)
+        Xt, y = self._split_multiple_tags_to_separate_entries(Xt, y)
+
         if self.model_path.exists():
             self._print("Loading model params...")
             params = t2v.load_params_shared(
@@ -55,6 +70,7 @@ class Tweet2Vec(Method):
 
         else:
             # Build dictionaries from training data
+            self.model_path.mkdir(parents=True)
             chardict, charcount = batch.build_dictionary(Xt)
             n_char = len(list(chardict.keys())) + 1
             batch.save_dictionary(
@@ -65,7 +81,9 @@ class Tweet2Vec(Method):
 
             labeldict, labelcount = batch.build_label_dictionary(y)
             batch.save_dictionary(
-                labeldict, labelcount, (self.model_path / "label_dict.pkl")
+                labeldict,
+                labelcount,
+                (self.model_path / "label_dict.pkl").as_posix(),
             )
 
             n_classes = min(len(list(labeldict.keys())) + 1, self.max_classes)
@@ -85,7 +103,7 @@ class Tweet2Vec(Method):
 
         # iterators
         train_iter = batch.BatchTweets(
-            x,
+            Xt,
             y,
             labeldict,
             batch_size=settings_char.N_BATCH,
@@ -135,7 +153,6 @@ class Tweet2Vec(Method):
         predict = theano.function([tweet, t_mask], predictions)
         cost_val = theano.function(inps, [cost_only, emb])
         train = theano.function(inps, cost, updates=updates)
-        reg_val = theano.function([], reg_only)
 
         # Training
         self._print("Training...")
@@ -156,6 +173,9 @@ class Tweet2Vec(Method):
                         )
                         uidx -= 1
                         continue
+                    import ipdb
+
+                    ipdb.set_trace()
 
                     curr_cost = train(x, x_m, y)
                     train_cost += curr_cost * len(xr)
@@ -312,3 +332,35 @@ class Tweet2Vec(Method):
         models_paths = list(self.model_path.glob("*.npz"))
         last_model_path = seq(models_paths).sorted(_get_value).first()
         return last_model_path
+
+    @classmethod
+    def _extract_hashtags(
+        cls, original_frame: pd.DataFrame
+    ) -> List[List[str]]:
+        return [
+            [tag["text"] for tag in entry]
+            for entry in original_frame["hashtags"]
+        ]
+
+    @classmethod
+    def _preprocess_lemmas(cls, tweets_lemmas: List[str]) -> List[str]:
+        output = []
+        for tweet in tweets_lemmas:
+            output.append(
+                seq(list(tweet))
+                    .filter(lambda char: char in VALID_CHARACTERS)
+                    .to_list()
+            )
+        return output
+
+    @classmethod
+    def _split_multiple_tags_to_separate_entries(
+        cls, lemmas: List[str], tags: List[List[str]]
+    ) -> Tuple[List[str], List[str]]:
+        new_x = []
+        new_y = []
+        for x_sample, y_sample in zip(lemmas, tags):
+            for tag in y_sample:
+                new_x.append(x_sample)
+                new_y.append(tag)
+        return new_x, new_y
