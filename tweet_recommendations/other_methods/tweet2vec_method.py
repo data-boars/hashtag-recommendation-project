@@ -117,8 +117,8 @@ class Tweet2Vec(Method):
         reg_only = (
             settings_char.REGULARIZATION
             * lasagne.regularization.regularize_network_params(
-                net, lasagne.regularization.l2
-            )
+            net, lasagne.regularization.l2
+        )
         )
 
         # params and updates
@@ -236,8 +236,8 @@ class Tweet2Vec(Method):
 
         # iterators
         test_iter = batch.BatchTweets(
-            Xt,
-            yt,
+            x,
+            None,
             labeldict,
             batch_size=settings_char.N_BATCH,
             max_classes=self.max_classes,
