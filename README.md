@@ -8,6 +8,18 @@ Michał Kosturek, Kacper Kania, Jakub Michałowski, Jakub Cwynar, Arkadiusz Janz
 This repository contains supplemental material for 
 the article _How To Increase Tweets Popularity? Recommending Hashtags with PageRank and Word Embedding Model_, submitted to CoNLL 2019. It contains implementations of introduced method, as well as baseline methods used as reference. All of them are compatible with scikit-learn API. We also share information on how to reconstruct datasets used for experiments.
 
+## Cloning repository
+
+```bash
+git clone https://github.com/data-boars/hashtag-recommendation-project.git
+git submodule init
+git submodule fetch
+```
+
+This will ensure that `tweet2vec` implementation will also be downloaded. The
+original implementation is available under 
+[this](https://github.com/bdhingra/tweet2vec) link.
+
 ## Repository structure 
 
 ```python
