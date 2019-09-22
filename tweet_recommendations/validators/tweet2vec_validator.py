@@ -11,6 +11,9 @@ from tweet_recommendations.other_methods.tweet2vec_method import Tweet2Vec
 lemmatizer = TaggerToygerLemmatizer("data/processed/lemmas.p")
 the_graph = Tweet2Vec(10, "models/init", True, -1)
 
+# use this once the model is learned
+# the_graph = Tweet2Vec(10, "models/init", True, 9)
+
 with open("data/source_data/original_tweets.p", "rb") as f:
     original_tweets = pkl.load(f)
 

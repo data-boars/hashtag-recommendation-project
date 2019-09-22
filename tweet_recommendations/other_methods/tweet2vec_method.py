@@ -35,6 +35,7 @@ VALID_CHARACTERS = (
 
 class Tweet2Vec(Method):
     """Adapter for tweet2vec method in scikit-learn manner."""
+
     def __init__(
         self,
         epochs: int,
@@ -89,14 +90,12 @@ class Tweet2Vec(Method):
         for key, index in self.labeldict.items():
             self.classnum_to_label_map[index] = key
 
-    def _load_model(self):
+    def _load_partial_model(self):
         """Load all necessary data so the model can work properly.
 
-        This includes weights of the model, a dict with mapping from a single
-        character to its class and a dict with mappings from hashtags to
-        appropriate intiger classes. If the `last_epoch` is provided, then
-        weights from file `model_{last_epochs}.npz` are loaded from the given
-        model directory.
+        This includes  a dict with mapping from a single character to its
+        class and a dict with mappings from hashtags to appropriate
+        integer classes.
         """
         self._print("Loading model params...")
         with open((self.model_path / "dict.pkl").as_posix(), "rb") as f:
@@ -108,7 +107,14 @@ class Tweet2Vec(Method):
         self.n_classes = min(
             len(list(self.labeldict.keys())) + 1, self.max_classes
         )
-        if self.last_epoch is not None:
+
+    def _load_weights(self):
+        """Load weights of the model.
+
+        If the `last_epoch` is provided, then weights from file
+        `model_{last_epochs}.npz` are loaded from the given model directory.
+        """
+        if self.last_epoch is not None and self.last_epoch >= 0:
             self.params = t2v.load_params(
                 (
                     self.model_path / "model_{}.npz".format(self.last_epoch)
@@ -117,7 +123,7 @@ class Tweet2Vec(Method):
         else:
             self.params = t2v.load_params(self._get_last_model().as_posix())
 
-    def _build_network(self):
+    def _build_network(self, load_params: bool = False):
         """Build network, including inputs, weights and the whole structure."""
         # Tweet variables
         self.tweet_input = T.itensor3()
@@ -137,6 +143,9 @@ class Tweet2Vec(Method):
         self.params["b_cl"] = theano.shared(
             np.zeros((self.n_classes,)).astype("float32"), name="b_cl"
         )
+
+        if load_params:
+            self._load_weights()
         # network for prediction
         predictions, net, embeddings = self._classify(
             self.tweet_input,
@@ -232,9 +241,10 @@ class Tweet2Vec(Method):
             len(list(self.labeldict.keys())) + 1, self.max_classes
         )
 
-        self._build_network()
-        if self.last_epoch >= 0:
-            self._load_model()
+        if self.last_epoch is not None and self.last_epoch >= 0:
+            self._build_network(load_params=True)
+        else:
+            self._build_network(load_params=False)
 
         # iterators
         train_iter = batch.BatchTweets(
@@ -243,6 +253,7 @@ class Tweet2Vec(Method):
             self.labeldict,
             batch_size=settings_char.N_BATCH,
             max_classes=self.max_classes,
+            shuffle=True,
         )
 
         self._print("Building network...")
@@ -341,8 +352,8 @@ class Tweet2Vec(Method):
         """
         # Model
         if self.params is None:
-            self._build_network()
-            self._load_model()
+            self._load_partial_model()
+            self._build_network(load_params=True)
 
         if type(x[0]) in [tuple, list, np.ndarray]:
             x = [" ".join(entry) for entry in x]
@@ -355,6 +366,7 @@ class Tweet2Vec(Method):
             batch_size=settings_char.N_BATCH,
             max_classes=self.max_classes,
             test=True,
+            shuffle=False
         )
 
         # Test
@@ -363,7 +375,7 @@ class Tweet2Vec(Method):
         for xr, y in test_iter:
             x, x_m = batch.prepare_data(xr, self.chardict, n_chars=self.n_char)
             p = self.predict(x, x_m)
-            ranks = np.argsort(p)[:, ::-1]
+            ranks = np.argsort(p, kind="mergesort", axis=-1)[:, ::-1]
 
             for idx, item in enumerate(xr):
                 out_pred.append(ranks[idx, :])
@@ -403,9 +415,10 @@ class Tweet2Vec(Method):
         Assumes that there are multiple models that were saved during training
         process.
         """
+
         def _get_value(path: Path):
             name = path.with_suffix("").name
-            epoch = int(name.split("_")[-1])
+            epoch = -int(name.split("_")[-1])
             return epoch
 
         models_paths = list(self.model_path.glob("*.npz"))
