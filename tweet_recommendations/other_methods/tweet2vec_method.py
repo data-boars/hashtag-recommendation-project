@@ -5,7 +5,11 @@ The original code is available at: https://github.com/bdhingra/tweet2vec
 """
 import os
 
-os.environ["THEANO_FLAGS"] = "floatX=float32,device=cuda0"
+os.environ["THEANO_FLAGS"] = (
+    "floatX=float32,"
+    "device=cuda4,"
+    "dnn.enabled=False,"
+)
 
 import pickle as pkl
 import string

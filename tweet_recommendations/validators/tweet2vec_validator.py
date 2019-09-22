@@ -9,7 +9,7 @@ from tweet_recommendations.other_methods.lemmatizer import (
 from tweet_recommendations.other_methods.tweet2vec_method import Tweet2Vec
 
 lemmatizer = TaggerToygerLemmatizer("data/processed/lemmas.p")
-the_graph = Tweet2Vec(1, "models/init", True, -1)
+the_graph = Tweet2Vec(10, "models/init", True, -1)
 
 with open("data/source_data/original_tweets.p", "rb") as f:
     original_tweets = pkl.load(f)
