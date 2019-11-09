@@ -3,14 +3,16 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 
-def split_train_test_by_user(tweets_df: pd.DataFrame, users_df: pd.DataFrame, split_on: str, test_size: str = 0.3):
-    tr_users, te_users = get_train_test_users(tweets_df, users_df, split_on, test_size)
+def split_train_test_by_user(tweets_df: pd.DataFrame, users_df: pd.DataFrame, split_on: str, test_size: str = 0.3,
+                         random_state=None):
+    tr_users, te_users = get_train_test_users(tweets_df, users_df, split_on, test_size, random_state)
     train = tweets_df[tweets_df["user_id"].isin(tr_users)]
     test = tweets_df[tweets_df["user_id"].isin(set(te_users))]
     return train, test
 
 
-def get_train_test_users(tweets_df: pd.DataFrame, users_df: pd.DataFrame, split_on: str, test_size: str = 0.3):
+def get_train_test_users(tweets_df: pd.DataFrame, users_df: pd.DataFrame, split_on: str, test_size: str = 0.3,
+                         random_state=None):
     if split_on == "retweet_count":
         users = tweets_df.groupby("user_id").agg({"retweet_count": "mean"}).reset_index()
         users = users.rename(columns={"retweet_count": "split_variable"})
@@ -30,5 +32,6 @@ def get_train_test_users(tweets_df: pd.DataFrame, users_df: pd.DataFrame, split_
     users = pd.concat([unpopular_users, popular_users])
     tr_users, te_users = train_test_split(users["user_id"],
                                           test_size=test_size,
-                                          stratify=users["decile"])
-    return tr_users, te_users
+                                          stratify=users["decile"],
+                                          random_state=random_state)
+    return tr_users.values, te_users.values
