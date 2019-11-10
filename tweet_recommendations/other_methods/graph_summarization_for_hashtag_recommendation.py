@@ -10,17 +10,19 @@ import scipy.sparse as sps
 import tqdm
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from tweet_recommendations.other_methods.method import Method
+from tweet_recommendations.method import Method
 from tweet_recommendations.other_methods.utils import ModifiedOneHotEncoder
 from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 
 
 class GraphSummarizationMethod(Method):
-    def __init__(self,
-                 minimal_random_walk_change_difference_value: float,
-                 damping_factor: float,
-                 max_iterations: int,
-                 verbose: bool = False):
+    def __init__(
+        self,
+        minimal_random_walk_change_difference_value: float,
+        damping_factor: float,
+        max_iterations: int,
+        verbose: bool = False,
+    ):
         """
         Creates estimator for predicting hashtag based on graph construction
         from https://sci-hub.tw/https://ieeexplore.ieee.org/document/7300890
@@ -43,7 +45,9 @@ class GraphSummarizationMethod(Method):
         self._transition_matrix: np.ndarray = None
         self._hashtag_encoder: ModifiedOneHotEncoder = ModifiedOneHotEncoder()
 
-        self.minimal_random_walk_change_difference_value = minimal_random_walk_change_difference_value
+        self.minimal_random_walk_change_difference_value = (
+            minimal_random_walk_change_difference_value
+        )
         self.damping_factor = damping_factor
         self.max_iterations = max_iterations
         self.verbose = verbose
@@ -96,16 +100,20 @@ class GraphSummarizationMethod(Method):
                 for neighbour in self.graph.neighbors(node):
                     if self.graph.node[neighbour]["type"] == "username":
                         for other_node in self.graph.neighbors(neighbour):
-                            if self.graph.node[other_node]["type"] == "hashtag" \
-                                    and not self.graph.has_edge(node, other_node) \
-                                    and not node == other_node:
+                            if (
+                                self.graph.node[other_node]["type"]
+                                == "hashtag"
+                                and not self.graph.has_edge(node, other_node)
+                                and not node == other_node
+                            ):
                                 new_graph.add_edge(node, other_node)
         self.graph = new_graph
 
     def _get_binary_incidence_matrix(self):
         # needed to preserve ordering
         all_labels = np.concatenate(
-            (self._hashtag_labels, self._tweet_labels, self._users_labels))
+            (self._hashtag_labels, self._tweet_labels, self._users_labels)
+        )
         incidence_matrix = nx.adjacency_matrix(self.graph, nodelist=all_labels)
 
         return incidence_matrix
@@ -124,7 +132,9 @@ class GraphSummarizationMethod(Method):
         self.graph = nx.Graph()
         minimal_hashtag_occurence = fit_params["minimal_hashtag_occurence"]
 
-        x = self.drop_tweets_with_hashtags_that_occurred_less_than(x, minimal_hashtag_occurence)
+        x = self.drop_tweets_with_hashtags_that_occurred_less_than(
+            x, minimal_hashtag_occurence
+        )
 
         hashtag_agg = defaultdict(list)
 
@@ -135,10 +145,13 @@ class GraphSummarizationMethod(Method):
         if self.verbose:
             print("Building graph ...")
             tqdm.tqdm.pandas()
-            x.progress_apply(lambda r: self._transform_single_row(hashtag_agg, r),
-                             axis=1)
+            x.progress_apply(
+                lambda r: self._transform_single_row(hashtag_agg, r), axis=1
+            )
         else:
-            x.apply(lambda r: self._transform_single_row(hashtag_agg, r), axis=1)
+            x.apply(
+                lambda r: self._transform_single_row(hashtag_agg, r), axis=1
+            )
 
         self._refine_matrix_with_additional_connections()
 
@@ -149,30 +162,40 @@ class GraphSummarizationMethod(Method):
         if self.verbose:
             print("Building incidence matrix ...")
         incidence_matrix = self._get_binary_incidence_matrix()[
-                           :len(self._hashtag_labels), len(self._hashtag_labels):]
-        weighted_adjacency_matrix_of_tags = incidence_matrix.dot(incidence_matrix.T)
+            : len(self._hashtag_labels), len(self._hashtag_labels) :
+        ]
+        weighted_adjacency_matrix_of_tags = incidence_matrix.dot(
+            incidence_matrix.T
+        )
         weighted_adjacency_matrix_of_tags.setdiag(0)
 
         if self.verbose:
             print("Building hashtag graph ...")
 
-        hashtag_graph = nx.from_scipy_sparse_matrix(weighted_adjacency_matrix_of_tags)
+        hashtag_graph = nx.from_scipy_sparse_matrix(
+            weighted_adjacency_matrix_of_tags
+        )
 
         weighted_degree = np.asarray(
-            list(map(itemgetter(1), hashtag_graph.degree(weight="weight"))))
+            list(map(itemgetter(1), hashtag_graph.degree(weight="weight")))
+        )
         matrix_weighted_degree = sps.diags([1 / (weighted_degree + 1e-8)], [0])
         self._transition_matrix = weighted_adjacency_matrix_of_tags.dot(
-            matrix_weighted_degree)
+            matrix_weighted_degree
+        )
 
         if self.verbose:
             print("Calculating tf idf ...")
 
-        document_list = [' '.join(hashtag_agg[key]) for key in self._hashtag_labels]
+        document_list = [
+            " ".join(hashtag_agg[key]) for key in self._hashtag_labels
+        ]
 
         # it has normalization inside, so no L2 is necessary
         self._hashtags_tf_idf_vectorizer = TfidfVectorizer(norm="l2")
         self._hashtags_tf_idf_representation = self._hashtags_tf_idf_vectorizer.fit_transform(
-            document_list)
+            document_list
+        )
 
         if self.verbose:
             print("Fitting hashtag encoders ...")
@@ -182,7 +205,9 @@ class GraphSummarizationMethod(Method):
 
         return self
 
-    def transform(self, x: Union[Tuple[Tuple[str, ...], ...], Tuple[str, ...]], **kwargs) -> np.ndarray:
+    def transform(
+        self, x: Union[Tuple[Tuple[str, ...], ...], Tuple[str, ...]], **kwargs
+    ) -> np.ndarray:
         """
         For a given tweet represented as a list of lemmas recommends hashtags.
         :param x: tuple of str or str. If tuple is str, strs are lemmas of the tweet. If single str, it is assumed that
@@ -196,12 +221,13 @@ class GraphSummarizationMethod(Method):
                 lemmatised[i] = get_wcrft2_results_for_text(xi)
         if isinstance(lemmatised[0], list):
             for i, xi in enumerate(lemmatised):
-                lemmatised[i] = ' '.join(xi)
+                lemmatised[i] = " ".join(xi)
 
         query_hashtags = kwargs.get("query", None)
         if query_hashtags is not None:
-            assert len(query_hashtags) == len(x), \
-                "If at least 1 query is given, the array should have the same dimension as input `x`"
+            assert len(query_hashtags) == len(
+                x
+            ), "If at least 1 query is given, the array should have the same dimension as input `x`"
         if isinstance(query_hashtags, str):
             query_hashtags = [query_hashtags] * len(lemmatised)
 
@@ -209,16 +235,25 @@ class GraphSummarizationMethod(Method):
         tf_idf_vectors = self._hashtags_tf_idf_vectorizer.transform(lemmatised)
 
         # ... so this simplifies to cosine similarity - no normalisation required
-        similarities = self._hashtags_tf_idf_representation.dot(tf_idf_vectors.T).T.toarray()
-        preference_vectors = self._get_preference_vectors(similarities, query_hashtags)
+        similarities = self._hashtags_tf_idf_representation.dot(
+            tf_idf_vectors.T
+        ).T.toarray()
+        preference_vectors = self._get_preference_vectors(
+            similarities, query_hashtags
+        )
         similarity_rank_vertices = self._random_walk(preference_vectors)
 
-        best_indices = np.argsort(-similarities * similarity_rank_vertices, axis=1)
+        best_indices = np.argsort(
+            -similarities * similarity_rank_vertices, axis=1
+        )
         result = self._hashtag_labels[best_indices].tolist()
         return self.post_process_result(result)
 
-    def _get_preference_vectors(self, tweet_content_similarities: np.ndarray,
-                                query_hashtags: Optional[Tuple[str]]) -> sps.csr_matrix:
+    def _get_preference_vectors(
+        self,
+        tweet_content_similarities: np.ndarray,
+        query_hashtags: Optional[Tuple[str]],
+    ) -> sps.csr_matrix:
         """
         Creates sparse matrix of preference vectors for each of N samples to recommend which are used to initialize
         random walk algorithm. If a query hashtag for a particular tweet is given, then it is used to create preference
@@ -239,18 +274,28 @@ class GraphSummarizationMethod(Method):
         preference_vectors = []
         for i in range(len(tweet_content_similarities)):
             if query_hashtags is None or query_hashtags[i] is None:
-                preference_vector = _get_using_similarities(tweet_content_similarities[i])
+                preference_vector = _get_using_similarities(
+                    tweet_content_similarities[i]
+                )
             else:
                 try:
-                    preference_vector = np.asarray(self._hashtag_encoder.transform([query_hashtags[i]]))[0]
+                    preference_vector = np.asarray(
+                        self._hashtag_encoder.transform([query_hashtags[i]])
+                    )[0]
                 except ValueError:
                     warnings.warn(
                         "Unknown hashtag: {}. Using the closest hashtag in terms of content similarity".format(
-                            query_hashtags[i]))
-                    preference_vector = _get_using_similarities(tweet_content_similarities[i])
+                            query_hashtags[i]
+                        )
+                    )
+                    preference_vector = _get_using_similarities(
+                        tweet_content_similarities[i]
+                    )
             preference_vectors.append(preference_vector)
         preference_vectors = np.vstack(preference_vectors)
-        preference_vectors = sps.csr_matrix(preference_vectors, preference_vectors.shape, dtype=np.float32)
+        preference_vectors = sps.csr_matrix(
+            preference_vectors, preference_vectors.shape, dtype=np.float32
+        )
 
         return preference_vectors
 
@@ -271,12 +316,22 @@ class GraphSummarizationMethod(Method):
             if self.verbose:
                 print("Step: {}".format(nb_iteration + 1))
 
-            similarity_rank_vertices = self.damping_factor * similarity_rank_vertices.dot(self._transition_matrix) + (
-                    1 - self.damping_factor) * preference_vectors
+            similarity_rank_vertices = (
+                self.damping_factor
+                * similarity_rank_vertices.dot(self._transition_matrix)
+                + (1 - self.damping_factor) * preference_vectors
+            )
 
             diff = np.sum(
-                np.abs(similarity_rank_vertices - previous_similarity_rank_vertices))
-            if nb_iteration > 0 and diff < self.minimal_random_walk_change_difference_value:
+                np.abs(
+                    similarity_rank_vertices
+                    - previous_similarity_rank_vertices
+                )
+            )
+            if (
+                nb_iteration > 0
+                and diff < self.minimal_random_walk_change_difference_value
+            ):
                 if self.verbose:
                     print("Converged with error: {:.6f}".format(diff))
                 break
@@ -285,8 +340,11 @@ class GraphSummarizationMethod(Method):
 
             if nb_iteration > self.max_iterations:
                 if self.verbose:
-                    print("Random walk did not converge, current error: {:.6f}".format(
-                        diff))
+                    print(
+                        "Random walk did not converge, current error: {:.6f}".format(
+                            diff
+                        )
+                    )
                 break
         return similarity_rank_vertices.toarray()
 
@@ -297,4 +355,9 @@ class GraphSummarizationMethod(Method):
         :return: np.ndarray. Tags in nd.ndarray without suffix.
         """
         to_cut = len("_tag")
-        return np.asarray([[tag[:-to_cut] for tag in list_of_tags] for list_of_tags in result])
+        return np.asarray(
+            [
+                [tag[:-to_cut] for tag in list_of_tags]
+                for list_of_tags in result
+            ]
+        )

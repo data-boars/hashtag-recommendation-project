@@ -6,9 +6,7 @@ The original code is available at: https://github.com/bdhingra/tweet2vec
 import os
 
 os.environ["THEANO_FLAGS"] = (
-    "floatX=float32,"
-    "device=cuda4,"
-    "dnn.enabled=False,"
+    "floatX=float32," "device=cuda4," "dnn.enabled=False,"
 )
 
 import pickle as pkl
@@ -24,7 +22,7 @@ import theano
 import theano.tensor as T
 from functional import seq
 
-from tweet_recommendations.other_methods.method import Method
+from tweet_recommendations.method import Method
 from .tweet2vec.tweet2vec import batch_char as batch, settings_char, t2v
 
 POLISH_CHARACTERS = "ąćęłńóśżź"
@@ -366,7 +364,7 @@ class Tweet2Vec(Method):
             batch_size=settings_char.N_BATCH,
             max_classes=self.max_classes,
             test=True,
-            shuffle=False
+            shuffle=False,
         )
 
         # Test
@@ -447,8 +445,8 @@ class Tweet2Vec(Method):
         for tweet in tweets_lemmas:
             output.append(
                 seq(list(tweet))
-                    .filter(lambda char: char in VALID_CHARACTERS)
-                    .to_list()
+                .filter(lambda char: char in VALID_CHARACTERS)
+                .to_list()
             )
         return output
 
