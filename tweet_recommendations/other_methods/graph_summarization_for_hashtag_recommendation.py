@@ -18,9 +18,9 @@ from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 class GraphSummarizationMethod(Method):
     def __init__(
         self,
-        minimal_random_walk_change_difference_value: float,
-        damping_factor: float,
-        max_iterations: int,
+        minimal_random_walk_change_difference_value: float = 1e-5,
+        damping_factor: float = 0.7,
+        max_iterations: int = 50,
         minimal_hashtag_occurrence: int = 10,
         verbose: bool = False,
     ):
