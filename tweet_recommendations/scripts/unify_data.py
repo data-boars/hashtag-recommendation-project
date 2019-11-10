@@ -32,6 +32,7 @@ def main():
     logging.info("Starting processing tweets.")
 
     tweets["user_id"] = tweets["user_id"].astype(int)
+    tweets.rename(columns={"tweet_id": "id"}, inplace=True)
     tweets["hashtags_list"] = tweets["hashtags"].apply(lambda htags: [x["text"] for x in htags])
 
     logging.info("Tweets have been processed.")
