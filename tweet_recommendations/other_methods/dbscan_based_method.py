@@ -23,6 +23,8 @@ class DBScanBasedMethod(Method):
     def __init__(
         self,
         path_to_keyedvectors_model: Optional[str] = None,
+        minimal_hashtag_occurrence: int = 10,
+        neighbours_count: int = 16,
         verbose: bool = False,
     ):
         """
@@ -32,6 +34,12 @@ class DBScanBasedMethod(Method):
         :param path_to_keyedvectors_model: Path to converted by script
             `convert_ embedding_model_to_mmap.py` gensim model. It can either
             word2vec or fasttext, `gensim` handles both.
+        :param minimal_hashtag_occurrence: int. If hashtag occurred less than
+            this number then it's not considered during prediction (simply
+            removed). To include all hashtags put number <= 0.
+        :param neighbours_count: int. Parameter needed to calculate epsilon param
+            for DBSCAN method. Min param value 2, max param value embedding
+            data count.
         :param verbose: Whether method should be verbose
         """
         self._clusters: Optional[np.ndarray] = None
@@ -45,6 +53,8 @@ class DBScanBasedMethod(Method):
         self._corresponding_to_centroids_data_hashtags = []
 
         self.verbose = verbose
+        self.minimal_hashtag_occurrence = minimal_hashtag_occurrence
+        self.neighbours_count = neighbours_count
 
     def fit(
         self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params
@@ -56,25 +66,13 @@ class DBScanBasedMethod(Method):
         :param x: pd.DataFrame with tweet content, user id, and separate
             hashtags. It is "original_tweets.p" in our case.
         :param y: None, needed for compatibility.
-        :param fit_params:
-            minimal_hashtag_occurrence: int. If hashtag occurred less than
-            this number then it's not considered during prediction (simply
-            removed). To include all hashtags put number <= 0.
-            neighbours_count: int. Parameter needed to calculate epsilon param
-            for DBSCAN method. Min param value 2, max param value embedding
-            data count.
         :return: self.
         """
-        minimal_hashtag_occurence = fit_params.get(
-            "minimal_hashtag_occurence", 10
-        )
-        neighbours_count = fit_params.get("neighbours_count", 16)
-
         if self.verbose:
             print(f"Data input shape: {x.shape}")
 
         x = self.drop_tweets_with_hashtags_that_occurred_less_than(
-            x, minimal_hashtag_occurence
+            x, self.minimal_hashtag_occurrence
         )
 
         if self.verbose:
@@ -94,7 +92,7 @@ class DBScanBasedMethod(Method):
 
         epsilon = np.mean(
             self.neighbours.query(
-                embeddings, k=neighbours_count, n_jobs=mp.cpu_count(), p=1
+                embeddings, k=self.neighbours_count, n_jobs=mp.cpu_count(), p=1
             )[0]
         )
 
