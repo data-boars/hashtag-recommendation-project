@@ -72,7 +72,7 @@ class GraphSummarizationMethod(Method):
         :param row: Single row of aforementioned dataframe.
         :return: None.
         """
-        user_id = row["user_id"] + "_user"
+        user_id = str(row["user_id"]) + "_user"
         tweet_id = str(row["id"]) + "_tweet"
         tags = row["hashtags"]
 
@@ -107,12 +107,12 @@ class GraphSummarizationMethod(Method):
         """
         new_graph = self.graph.copy()
         for node in tqdm.tqdm(self.graph.nodes(), disable=not self.verbose):
-            if self.graph.node[node]["type"] == "hashtag":
+            if self.graph.nodes[node]["type"] == "hashtag":
                 for neighbour in self.graph.neighbors(node):
-                    if self.graph.node[neighbour]["type"] == "user_id":
+                    if self.graph.nodes[neighbour]["type"] == "user_id":
                         for other_node in self.graph.neighbors(neighbour):
                             if (
-                                self.graph.node[other_node]["type"]
+                                self.graph.nodes[other_node]["type"]
                                 == "hashtag"
                                 and not self.graph.has_edge(node, other_node)
                                 and not node == other_node
