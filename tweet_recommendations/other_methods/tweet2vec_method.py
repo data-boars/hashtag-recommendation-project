@@ -58,7 +58,7 @@ class Tweet2Vec(Method):
         :param last_epoch: Last epoch of training that the learning should
             be continued from. Also, it used to point a particular file of many
             that are saved every epoch during epoch. If the value is None or
-            is less then 0, then weights from the last epoch will be loaded.
+            is less than 0, then weights from the last epoch will be loaded.
         """
         self.model_path = Path(model_path)
         self.epochs = epochs
