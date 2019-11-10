@@ -182,7 +182,7 @@ class GraphSummarizationMethod(Method):
 
         return self
 
-    def transform(self, x: Union[Tuple[Tuple[str, ...]], Tuple[str, ...]], **kwargs) -> np.ndarray:
+    def transform(self, x: Union[Tuple[Tuple[str, ...], ...], Tuple[str, ...]], **kwargs) -> np.ndarray:
         """
         For a given tweet represented as a list of lemmas recommends hashtags.
         :param x: tuple of str or str. If tuple is str, strs are lemmas of the tweet. If single str, it is assumed that

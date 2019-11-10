@@ -116,7 +116,7 @@ class DBScanBasedEstimator(Method):
 
         return self
 
-    def transform(self, x: Union[Tuple[Tuple[str, ...]], Tuple[str, ...]], **kwargs) -> np.ndarray:
+    def transform(self, x: Union[Tuple[Tuple[str, ...], ...], Tuple[str, ...]], **kwargs) -> np.ndarray:
         """
         For a given tweet/tweets embeddings recommend hashtags.
         :param x: tuple of tuple of str or tuple of str. If first argument of x is a tuple is str, it is assumed that

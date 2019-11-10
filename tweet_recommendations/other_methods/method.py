@@ -10,7 +10,7 @@ class Method(TransformerMixin, BaseEstimator):
     def fit(self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params) -> "Method":
         raise NotImplementedError
 
-    def transform(self, x: Union[Tuple[Tuple[str, ...]], Tuple[str, ...]], **transform_params) -> np.ndarray:
+    def transform(self, x: Union[Tuple[Tuple[str, ...], ...], Tuple[str, ...]], **transform_params) -> np.ndarray:
         raise NotImplementedError
 
     @classmethod
