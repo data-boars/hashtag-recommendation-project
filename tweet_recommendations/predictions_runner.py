@@ -115,7 +115,6 @@ def make_predictions(
         dataset_path / "train_val_test_splits.pkl"
     )
     tweets = pd.read_pickle(dataset_path / "tweets.pkl")
-    tweets.rename({"tweet_id": "id"}, axis=1, inplace=True)
     train_val_test_splits = train_val_test_splits[split_name]
 
     # validation split is left for the hyperparameter optimization
