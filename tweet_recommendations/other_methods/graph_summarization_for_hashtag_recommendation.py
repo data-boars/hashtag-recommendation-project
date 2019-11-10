@@ -72,18 +72,18 @@ class GraphSummarizationMethod(Method):
         :param row: Single row of aforementioned dataframe.
         :return: None.
         """
-        user_name = row["username"] + "_user"
+        user_id = row["user_id"] + "_user"
         tweet_id = str(row["id"]) + "_tweet"
         tags = row["hashtags"]
 
-        self._users_labels.add(user_name)
+        self._users_labels.add(user_id)
         self._tweet_labels.add(tweet_id)
 
-        if not self.graph.has_node(user_name):
-            self.graph.add_node(user_name, type="username")
+        if not self.graph.has_node(user_id):
+            self.graph.add_node(user_id, type="user_id")
 
         if not self.graph.has_node(tweet_id):
-            self.graph.add_node(tweet_id, type="tweet_id")
+            self.graph.add_node(tweet_id, type="id")
 
         for hashtag_index in tags:
             tag = hashtag_index["text"] + "_tag"
@@ -92,8 +92,8 @@ class GraphSummarizationMethod(Method):
             if not self.graph.has_node(tag):
                 self.graph.add_node(tag, type="hashtag")
 
-            if not self.graph.has_edge(tag, user_name):
-                self.graph.add_edge(tag, user_name)
+            if not self.graph.has_edge(tag, user_id):
+                self.graph.add_edge(tag, user_id)
 
             if not self.graph.has_edge(tag, tweet_id):
                 self.graph.add_edge(tag, tweet_id)
@@ -109,7 +109,7 @@ class GraphSummarizationMethod(Method):
         for node in tqdm.tqdm(self.graph.nodes(), disable=not self.verbose):
             if self.graph.node[node]["type"] == "hashtag":
                 for neighbour in self.graph.neighbors(node):
-                    if self.graph.node[neighbour]["type"] == "username":
+                    if self.graph.node[neighbour]["type"] == "user_id":
                         for other_node in self.graph.neighbors(neighbour):
                             if (
                                 self.graph.node[other_node]["type"]
