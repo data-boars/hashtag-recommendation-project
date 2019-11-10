@@ -21,28 +21,36 @@ class GraphSummarizationMethod(Method):
         minimal_random_walk_change_difference_value: float,
         damping_factor: float,
         max_iterations: int,
+        minimal_hashtag_occurrence: int = 10,
         verbose: bool = False,
     ):
         """
         Creates estimator for predicting hashtag based on graph construction
         from https://sci-hub.tw/https://ieeexplore.ieee.org/document/7300890
+
         :param minimal_random_walk_change_difference_value: float. Small value.
-            It is used for stop criterion in random walk. If difference between random walk values from previous
-            step and random walk values from current step is less than that value, then algorithm is stopped.
-        :param damping_factor: float. 0 <= damping_factor <= 1. Probability between random walk and restart.
-        :param max_iterations: int. max_iterations > 0. Maximal value of iterations to perform for random walk.
+            It is used for stop criterion in random walk. If difference between
+            random walk values from previous step and random walk values from
+            current step is less than that value, then algorithm is stopped.
+        :param damping_factor: float. 0 <= damping_factor <= 1. Probability
+            between random walk and restart.
+        :param max_iterations: int. max_iterations > 0. Maximal value of
+            iterations to perform for random walk.
+        :param minimal_hashtag_occurrence: int. If hashtag occurred less than
+            this number then it's not considered during prediction (simply
+            removed). To include all hashtags put number <= 0.
         :param verbose: bool. Whether method should be talkative.
         """
-        self.graph: nx.Graph = None
+        self.graph: Optional[nx.Graph] = None
 
-        self._hashtags_tf_idf_vectorizer: TfidfVectorizer = None
-        self._hashtags_tf_idf_representation: np.ndarray = None
+        self._hashtags_tf_idf_vectorizer: Optional[TfidfVectorizer] = None
+        self._hashtags_tf_idf_representation: Optional[np.ndarray] = None
 
-        self._hashtag_labels: Union[set, np.ndarray] = None
-        self._users_labels: Union[set, np.ndarray] = None
-        self._tweet_labels: Union[set, np.ndarray] = None
+        self._hashtag_labels: Optional[Union[set, np.ndarray]] = None
+        self._users_labels: Optional[Union[set, np.ndarray]] = None
+        self._tweet_labels: Optional[Union[set, np.ndarray]] = None
 
-        self._transition_matrix: np.ndarray = None
+        self._transition_matrix: Optional[np.ndarray] = None
         self._hashtag_encoder: ModifiedOneHotEncoder = ModifiedOneHotEncoder()
 
         self.minimal_random_walk_change_difference_value = (
@@ -51,14 +59,17 @@ class GraphSummarizationMethod(Method):
         self.damping_factor = damping_factor
         self.max_iterations = max_iterations
         self.verbose = verbose
+        self.minimal_hashtag_occurrence = minimal_hashtag_occurrence
 
     def _transform_single_row(self, hashtag_agg: Dict, row: pd.Series):
         """
-        Transforms single row of pandas `original_tweets_with_lemmas.p` to graph. Suffixes in node names are needed due
-        to intersection between hashtags and user names.
-        :param hashtag_agg: Dict[str, List[str]]. Agreggation for hashtag tf-idf calculation. Each hashtag is
-            represented by list of words which it occurs in.
-        :param row: pd.Series. Single row of aforementioned dataframe.
+        Transforms single row of pandas `original_tweets_with_lemmas.p` to
+        graph. Suffixes in node names are needed due to intersection between
+        hashtags and user names.
+
+        :param hashtag_agg: Agreggation for hashtag tf-idf calculation. Each
+            hashtag is represented by list of words which it occurs in.
+        :param row: Single row of aforementioned dataframe.
         :return: None.
         """
         user_name = row["username"] + "_user"
@@ -120,20 +131,18 @@ class GraphSummarizationMethod(Method):
 
     def fit(self, x: pd.DataFrame, y=None, **fit_params) -> "Method":
         """
-        Builds tri partite graph of Users - Hashtags - Tweets. Hashtags are connected if has the same user.
-        :param x: pd.DataFrame with tweet content, user id, and separate hashtags. It is "original_tweets.p" in our
-            case.
+        Builds tri partite graph of Users - Hashtags - Tweets. Hashtags are
+        connected if has the same user.
+
+        :param x: pd.DataFrame with tweet content, user id, and separate
+            hashtags. It is "original_tweets.p" in our case.
         :param y: None, needed for compatibility.
-        :param fit_params:
-            minimal_hashtag_occurrence: int. If hashtag occurred less than this number then it's not considered during
-                prediction (simply removed). To include all hashtags put number <= 0.
         :return: self.
         """
         self.graph = nx.Graph()
-        minimal_hashtag_occurence = fit_params["minimal_hashtag_occurence"]
 
         x = self.drop_tweets_with_hashtags_that_occurred_less_than(
-            x, minimal_hashtag_occurence
+            x, self.minimal_hashtag_occurrence
         )
 
         hashtag_agg = defaultdict(list)
@@ -193,14 +202,15 @@ class GraphSummarizationMethod(Method):
 
         # it has normalization inside, so no L2 is necessary
         self._hashtags_tf_idf_vectorizer = TfidfVectorizer(norm="l2")
-        self._hashtags_tf_idf_representation = self._hashtags_tf_idf_vectorizer.fit_transform(
-            document_list
+        self._hashtags_tf_idf_representation = (
+            self._hashtags_tf_idf_vectorizer.fit_transform( document_list )
         )
 
         if self.verbose:
             print("Fitting hashtag encoders ...")
 
-        # [:-4] because each hashtag has "_tag" postfix to distinguish it in the graph
+        # [:-4] because each hashtag has "_tag" postfix to distinguish it in
+        # the graph
         self._hashtag_encoder.fit([lab[:-4] for lab in self._hashtag_labels])
 
         return self
@@ -210,9 +220,11 @@ class GraphSummarizationMethod(Method):
     ) -> np.ndarray:
         """
         For a given tweet represented as a list of lemmas recommends hashtags.
-        :param x: tuple of str or str. If tuple is str, strs are lemmas of the tweet. If single str, it is assumed that
-            lemmatization has to be performed.
-        :key query: Iterable[str]. Optional query hashtag for each tweet in `x`.
+        :param x: tuple of str or str. If tuple is str, strs are lemmas of the
+            tweet. If single str, it is assumed that lemmatization has to be
+            performed.
+        :key query: Iterable[str]. Optional query hashtag for each tweet in
+            `x`.
         :return: np.ndarray of recommended hashtags.
         """
         lemmatised = list(x[:])
@@ -227,14 +239,16 @@ class GraphSummarizationMethod(Method):
         if query_hashtags is not None:
             assert len(query_hashtags) == len(
                 x
-            ), "If at least 1 query is given, the array should have the same dimension as input `x`"
+            ), "If at least 1 query is given, the array should have the " \
+               "same dimension as input `x`"
         if isinstance(query_hashtags, str):
             query_hashtags = [query_hashtags] * len(lemmatised)
 
         # as in fit, vectorizer has normalization inside ...
         tf_idf_vectors = self._hashtags_tf_idf_vectorizer.transform(lemmatised)
 
-        # ... so this simplifies to cosine similarity - no normalisation required
+        # ... so this simplifies to cosine similarity - no
+        # normalisation required
         similarities = self._hashtags_tf_idf_representation.dot(
             tf_idf_vectors.T
         ).T.toarray()
@@ -255,13 +269,15 @@ class GraphSummarizationMethod(Method):
         query_hashtags: Optional[Tuple[str]],
     ) -> sps.csr_matrix:
         """
-        Creates sparse matrix of preference vectors for each of N samples to recommend which are used to initialize
-        random walk algorithm. If a query hashtag for a particular tweet is given, then it is used to create preference
-        vector. The most similar hashtag is used otherwise.
-        :param tweet_content_similarities: np.ndarray. Similarities between given N samples to predict and already fit
-            hashtags.
-        :param query_hashtags: Optional collection of strings. Used to initialize preference vector in accordance with
-            the paper.
+        Creates sparse matrix of preference vectors for each of N samples to
+        recommend which are used to initialize random walk algorithm. If a
+        query hashtag for a particular tweet is given, then it is used to
+        create preference vector. The most similar hashtag is used otherwise.
+
+        :param tweet_content_similarities: np.ndarray. Similarities between
+            given N samples to predict and already fit hashtags.
+        :param query_hashtags: Optional collection of strings. Used to
+            initialize preference vector in accordance with the paper.
         :return: Sparse matrix of N one hot vectors.
         """
 
@@ -284,7 +300,8 @@ class GraphSummarizationMethod(Method):
                     )[0]
                 except ValueError:
                     warnings.warn(
-                        "Unknown hashtag: {}. Using the closest hashtag in terms of content similarity".format(
+                        "Unknown hashtag: {}. Using the closest hashtag in "
+                        "terms of content similarity".format(
                             query_hashtags[i]
                         )
                     )
@@ -301,13 +318,18 @@ class GraphSummarizationMethod(Method):
 
     def _random_walk(self, preference_vectors: sps.csr_matrix) -> np.ndarray:
         """
-        Performs random walk algorithm on graph using transition matrix calculated in `fit`, given similarities of input
-        tweet to hashtags representations calculated as tf idf in `fit` method. Random walk lasts until no changes are
-        noticed in node values or algorithm exceeded upper limit of possible iterations.
-        :param preference_vectors: Sparse matrix N x M of length N, where N is a number of samples to recommend and
-            M is a total number of hashtags used during fit.
-        :return: Vector of length N, where each element consists probability of going from node representing
-            hashtag in `preference_vector` to other nodes. The higher probability, the better hashtag.
+        Performs random walk algorithm on graph using transition matrix
+        calculated in `fit`, given similarities of input tweet to hashtags
+        representations calculated as tf idf in `fit` method. Random walk
+        lasts until no changes are noticed in node values or algorithm
+        exceeded upper limit of possible iterations.
+
+        :param preference_vectors: Sparse matrix N x M of length N, where N is
+            a number of samples to recommend and M is a total number of
+            hashtags used during fit.
+        :return: Vector of length N, where each element consists probability
+            of going from node representing hashtag in `preference_vector`
+            to other nodes. The higher probability, the better hashtag.
         """
         similarity_rank_vertices = preference_vectors
         nb_iteration = 0
@@ -348,10 +370,14 @@ class GraphSummarizationMethod(Method):
                 break
         return similarity_rank_vertices.toarray()
 
-    def post_process_result(self, result: np.ndarray) -> np.ndarray:
+    @classmethod
+    def post_process_result(cls, result: np.ndarray) -> np.ndarray:
         """
-        Removes ending suffix that was used to distinguish between nodes with the same name but different category.
-        :param result: list of strings. Result containing hashtags sorted by recommendation value
+        Removes ending suffix that was used to distinguish between nodes with
+        the same name but different category.
+
+        :param result: list of strings. Result containing hashtags sorted by
+            recommendation value
         :return: np.ndarray. Tags in nd.ndarray without suffix.
         """
         to_cut = len("_tag")
