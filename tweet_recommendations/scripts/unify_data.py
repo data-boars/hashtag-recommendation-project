@@ -11,10 +11,11 @@ def main():
                                      "--output_users_path './data/our/users.pkl' "
                                      "--output_tweets_path './data/our/tweets.pkl' "
                                      "--verbose \n")
-    parser.add_argument("--source_path", help="Path to source .pkl file containing dict with users and tweets DataFrames")
-    parser.add_argument("--output_users_path", help="Path for an output .pkl file containing users DF.")
-    parser.add_argument("--output_tweets_path", help="Path for an output .pkl file containing tweets DF.")
-    parser.add_argument("-v", "--verbose", help="Increase output verbosity",
+    parser.add_argument("--source_path", required=True,
+                        help="Path to source .pkl file containing dict with users and tweets DataFrames")
+    parser.add_argument("--output_users_path", required=True, help="Path for an output .pkl file containing users DF.")
+    parser.add_argument("--output_tweets_path", required=True, help="Path for an output .pkl file containing tweets DF.")
+    parser.add_argument("--verbose", help="Increase output verbosity",
                         action="store_true")
     args = parser.parse_args()
 
