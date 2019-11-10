@@ -1,0 +1,3 @@
+epochs: 10
+model_path: experiments/tweet2vec_our_dataset_model
+verbose: true
