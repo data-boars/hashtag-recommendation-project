@@ -232,30 +232,30 @@ class OurMethod(Method):
         :return: nx.Graph of tweets & hashtags.
         """
 
-        G = nx.Graph()
+        g = nx.Graph()
 
         def add_row_to_graph(row, graph, embedding_name):
             if len(row["hashtags"]) > 0:
                 graph.add_node(row["id"])
-                graph.node[row["id"]]["node_type"] = "tweet"
-                graph.node[row["id"]]["retweets"] = row["retweet_count"]
-                graph.node[row["id"]][embedding_name] = row[embedding_name]
+                graph.nodes[row["id"]]["node_type"] = "tweet"
+                graph.nodes[row["id"]]["retweets"] = row["retweet_count"]
+                graph.nodes[row["id"]][embedding_name] = row[embedding_name]
 
                 for hashtag in row.hashtags:
                     graph.add_node(hashtag)
-                    graph.node[hashtag]["node_type"] = "hashtag"
+                    graph.nodes[hashtag]["node_type"] = "hashtag"
                     graph.add_edge(row["id"], hashtag)
 
         if self.verbose:
             tqdm.tqdm.pandas()
             tweets.progress_apply(
-                lambda r: add_row_to_graph(r, G, self.embedding_name), axis=1
+                lambda r: add_row_to_graph(r, g, self.embedding_name), axis=1
             )
         else:
             tweets.apply(
-                lambda r: add_row_to_graph(r, G, self.embedding_name), axis=1
+                lambda r: add_row_to_graph(r, g, self.embedding_name), axis=1
             )
-        return G
+        return g
 
     def _calculate_hashtag_embeddings_and_mean_retweets(self):
 
