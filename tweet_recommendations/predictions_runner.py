@@ -1,6 +1,7 @@
 import argparse
 import importlib
 import json
+import numpy as np
 import time
 import typing as t
 from pathlib import Path
@@ -11,6 +12,7 @@ import yaml
 from tweet_recommendations.method import Method
 
 KwargsType = t.Optional[t.Dict[str, t.Any]]
+PREDICTIONS_LIMIT = 200
 
 
 def get_args() -> argparse.Namespace:
@@ -124,20 +126,24 @@ def make_predictions(
     train_tweets = tweets[tweets["user_id"].isin(train_tweets_ids)]
     test_tweets = tweets[tweets["user_id"].isin(test_tweets_ids)]
 
-    fit_time, _ = time_exectuion(model.fit, x=train_tweets)
     if "lemmas" in train_tweets.columns:
-        train_data = train_tweets["lemmas"]
-        test_data = test_tweets["lemmas"]
+        train_data = train_tweets["lemmas"].tolist()
+        test_data = test_tweets["lemmas"].tolist()
     else:
-        train_data = train_tweets["text"]
-        test_data = test_tweets["text"]
+        train_data = train_tweets["text"].tolist()
+        test_data = test_tweets["text"].tolist()
 
+    fit_time, _ = time_exectuion(model.fit, x=train_tweets)
     predict_train_time, train_predictions = time_exectuion(
         model.transform, x=train_data
     )
     predict_test_time, test_predictions = time_exectuion(
         model.transform, x=test_data
     )
+
+    if isinstance(train_predictions, np.ndarray):
+        train_predictions = train_predictions[:, :PREDICTIONS_LIMIT].tolist()
+        test_predictions = test_predictions[:, :PREDICTIONS_LIMIT].tolist()
 
     train_y_pred_true_frame = pd.DataFrame(
         data={
