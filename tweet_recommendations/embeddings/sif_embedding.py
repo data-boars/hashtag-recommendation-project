@@ -21,23 +21,26 @@ class SIFEmbedding(Method):
         verbose: bool = False,
     ):
         """
-        Method for creating embeddings out of words and combining them into single tweet embedding with modified
-        weighted average of those embeddings.
-        :param path_to_keyedvectors_model: Path to converted by script `convert_embedding_model_to_mmap.py` gensim
-            model. It can either word2vec or fasttext, `gensim` handles both.
+        Method for creating embeddings out of words and combining them into
+        single tweet embedding with modified weighted average of those
+        embeddings.
+
+        :param path_to_keyedvectors_model: Path to converted by script `convert
+            embedding_model_to_mmap.py` gensim model. It can either word2vec
+            or fasttext, `gensim` handles both.
         :param tweet_embedding_name: Optional, name of used embedding method.
-                Required when `path_to_keyedvectors_model` is not provided.
-                Input DataFrame in `fit` method will have to contain column
-                named the same as value provided to this argument.
-                If `path_to_keyedvectors_model` is provided `embedding_name`
-                is ignored and is just used as a name.
+            Required when `path_to_keyedvectors_model` is not provided.
+            Input DataFrame in `fit` method will have to contain column
+            named the same as value provided to this argument.
+            If `path_to_keyedvectors_model` is provided `embedding_name`
+            is ignored and is just used as a name.
         :param words_embeddings_name: Optional, name of used embedding method.
-                Required when `path_to_keyedvectors_model` is not provided.
-                Input DataFrame in `fit` method will have to contain column
-                named the same as value provided to this argument. Every column
-                element should contain a list of word embedding for a given sentence.
-                If `path_to_keyedvectors_model` is provided `words_embeddings_name`
-                is ignored and is just used as a name.
+            Required when `path_to_keyedvectors_model` is not provided.
+            Input DataFrame in `fit` method will have to contain column
+            named the same as value provided to this argument. Every column
+            element should contain a list of word embedding for a given sentence.
+            If `path_to_keyedvectors_model` is provided `words_embeddings_name`
+            is ignored and is just used as a name.
         :param verbose: Whether method should be verbose.
         """
         self.verbose = verbose
@@ -53,7 +56,8 @@ class SIFEmbedding(Method):
             )
         elif self.verbose:
             print(
-                "No keyed vector found. \n Embeddings will be acquired from the input data ..."
+                "No keyed vector found. \n "
+                "Embeddings will be acquired from the input data ..."
             )
 
         self.words_weights = None
@@ -63,13 +67,12 @@ class SIFEmbedding(Method):
         self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params
     ) -> "SIFEmbedding":
         """
-
         :param x: DataFrame which should contain tweet text lemmas
         :param y: None for compatibility
-        :param fit_params: min_word_occurrences: int. Parameter limiting/filtering infrequent words.
-                           smoothing: int. Smoothing value parameter.
-                           random_state: int. Parameter used for calculating principal components.
-
+        :param fit_params: min_word_occurrences: int. Parameter
+            limiting/filtering infrequent words. smoothing: int.
+            Smoothing value parameter. random_state: int. Parameter used for
+            calculating principal components.
         :return: self
         """
         min_word_occurence = fit_params.get("min_word_occurences", 0)
@@ -112,10 +115,12 @@ class SIFEmbedding(Method):
     ) -> np.ndarray:
         """
         For a given tweet represented as a list of lemmas recommends hashtags.
-        :param x: list of list of str or list of str. If first argument of x is a list is str, it is assumed that list
-            contains already lemmatized text. If single str is present as first element, it is assumed
-            that lemmatization has to be performed. A DataFrame can be passed if it contains lemmatized sentences with
-            its corresponding embeddings.
+
+        :param x: list of list of str or list of str. If first argument of x is
+            a list is str, it is assumed that list contains already lemmatized
+            text. If single str is present as first element, it is assumed that
+            lemmatization has to be performed. A DataFrame can be passed if it
+            contains lemmatized sentences with its corresponding embeddings.
         :return: np.ndarray of sentences embeddings.
         """
         if self.keyed_vector_model:
@@ -139,6 +144,7 @@ class SIFEmbedding(Method):
     ) -> np.ndarray:
         """
         Compute the weighted average vectors for given tweet content lemmas.
+
         :param data: DataFrame which should contain tweet text lemmas.
         :return: Weighted average of tweet embeddings.
         """
@@ -180,8 +186,9 @@ class SIFEmbedding(Method):
                     ) / len(sentence_word_weights)
         return emb
 
+    @classmethod
     def _compute_pc(
-        self, tweets_embeddings: np.ndarray, random_state
+        cls, tweets_embeddings: np.ndarray, random_state
     ) -> np.ndarray:
         """
         Compute the first principal components for given tweet embedding matrix.
@@ -211,8 +218,10 @@ class SIFEmbedding(Method):
         """
         Compute tweet content embedding using weighted average with
         removing the projection on the first principal component
-        :param data: sentences is a list of lemmatized tweet word list or DataFrame
-        with list of lemmatized tweet word list and its embeddings
+
+        :param data: sentences is a list of lemmatized tweet word list or
+            DataFrame with list of lemmatized tweet word list and its
+            embeddings.
         :return: emb is a array of tweets embeddings
         """
         emb = self._get_weighted_average_embeddings(data)
