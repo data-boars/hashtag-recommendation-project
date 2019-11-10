@@ -19,7 +19,7 @@ from tweet_recommendations.method import Method
 MIN_SAMPLES = 1
 
 
-class DBScanBasedEstimator(Method):
+class DBScanBasedMethod(Method):
     def __init__(
         self,
         path_to_keyedvectors_model: Optional[str] = None,
