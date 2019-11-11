@@ -28,7 +28,7 @@ def main():
                                      "--output_split_path './data/our/train_val_test_split.pkl' "
                                      "-t 0.2 -v 0.2 --seed '0xCAFFE'"
                                      "--verbose \n")
-    parser.add_argument("--source_tweets", help="Path to source .pkl file containing tweets DataFrame.", required=True)
+    parser.add_argument("--source_tweets", help="Path to source .pkl file containing tweets DataFrame. You can specify multiple files separated by `;`.", required=True)
     parser.add_argument("--source_users", help="Path to source .pkl file containing users DataFrame.", required=True)
     parser.add_argument("--output_split_path", required=True,
                         help="Path for an output .pkl file with dict with splitting result.")
@@ -49,7 +49,10 @@ def main():
     SEED = eval(args.seed)
 
     logging.info("Reading source files...")
-    tweets = pd.read_pickle(args.source_tweets)
+    tweets = []
+    for fname in args.source_tweets.split(";"):
+        tweets.append(pd.read_pickle(fname))
+    tweets = pd.concat(tweets, ignore_index=True)
     users = pd.read_pickle(args.source_users)
 
     logging.info("Source data successfully loaded.")
