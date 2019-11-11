@@ -149,6 +149,7 @@ def make_predictions(
         data={
             "pred": train_predictions,
             "true": extract_ground_truth_from_frame(train_tweets),
+            "tweet_id": train_tweets["id"],
         }
     )
 
@@ -156,6 +157,7 @@ def make_predictions(
         data={
             "pred": test_predictions,
             "true": extract_ground_truth_from_frame(test_tweets),
+            "tweet_id": test_tweets["id"],
         }
     )
 
