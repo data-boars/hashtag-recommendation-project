@@ -32,7 +32,9 @@ def lift(df: pd.DataFrame, split_col: str, metric_name: str, nb_groups: int = 10
         line = go.Scatter(x=[bar.x[0], bar.x[-1]],
                           y=[population_mean_metric]*2, name=f"Whole population average {metric_name}")
         return go.Figure(data=[bar, line],
-                         layout=dict(title=f"{'Cumulative - ' if cumulative else ''} {title}"))
+                         layout={"title":f"{'Cumulative - ' if cumulative else ''} {title}",
+                                 "xaxis_title": split_col,
+                                 "yaxis_title": avg_metric_name})
     else:
         fig, ax = plt.subplots(**pyplot_kwargs)
         bar = gb.plot.bar(split_col, avg_metric_name, title=f"{'Cumulative - ' if cumulative else ''} {title}", ax=ax)
