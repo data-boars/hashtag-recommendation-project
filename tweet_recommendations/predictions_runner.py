@@ -4,12 +4,28 @@ import json
 import numpy as np
 import time
 import typing as t
+import logging
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
 from tweet_recommendations.method import Method
+
+logger = logging.getLogger("Predictions")
+formatter = logging.Formatter(
+    "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+)
+
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+
+file_hdlr = logging.FileHandler("log.log")
+file_hdlr.setFormatter(formatter)
+
+logger.addHandler(handler)
+logger.addHandler(file_hdlr)
+logger.setLevel(logging.INFO)
 
 KwargsType = t.Optional[t.Dict[str, t.Any]]
 PREDICTIONS_LIMIT = 200
@@ -133,10 +149,15 @@ def make_predictions(
         train_data = train_tweets["text"].tolist()
         test_data = test_tweets["text"].tolist()
 
+    logger.info("Fitting time ...")
     fit_time, _ = time_exectuion(model.fit, x=train_tweets)
+
+    logger.info("Predicting on training data ...")
     predict_train_time, train_predictions = time_exectuion(
         model.transform, x=train_data
     )
+
+    logger.info("Predicting on test data ...")
     predict_test_time, test_predictions = time_exectuion(
         model.transform, x=test_data
     )
