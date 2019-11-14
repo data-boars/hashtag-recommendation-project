@@ -25,6 +25,7 @@ class DBScanBasedMethod(Method):
         path_to_keyedvectors_model: Optional[str] = None,
         minimal_hashtag_occurrence: int = 10,
         neighbours_count: int = 16,
+        max_tags_to_return: int = 1000,
         verbose: bool = False,
     ):
         """
@@ -37,9 +38,11 @@ class DBScanBasedMethod(Method):
         :param minimal_hashtag_occurrence: int. If hashtag occurred less than
             this number then it's not considered during prediction (simply
             removed). To include all hashtags put number <= 0.
-        :param neighbours_count: int. Parameter needed to calculate epsilon param
-            for DBSCAN method. Min param value 2, max param value embedding
-            data count.
+        :param neighbours_count: int. Parameter needed to calculate epsilon
+            param for DBSCAN method. Min param value 2, max param value
+            embedding data count.
+        :param max_tags_to_return: Maximum number of hashtags to
+            return during prediction.
         :param verbose: Whether method should be verbose
         """
         self._clusters: Optional[np.ndarray] = None
@@ -55,6 +58,7 @@ class DBScanBasedMethod(Method):
         self.verbose = verbose
         self.minimal_hashtag_occurrence = minimal_hashtag_occurrence
         self.neighbours_count = neighbours_count
+        self.max_tags_to_return = max_tags_to_return
 
     def fit(
         self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params
@@ -178,24 +182,37 @@ class DBScanBasedMethod(Method):
             assumed that lemmatization has to be performed.
         :return: Iterable of recommended hashtags.
         """
+        if self.verbose:
+            print("Embedding using SIF method ...")
         embeddings = self.sif_embedding.transform(x)
         embeddings = (
             embeddings
             if len(embeddings.shape) == 2
             else embeddings.reshape(1, -1)
         )
+
+        if self.verbose:
+            print("Calculating distances to tags ...")
         distances = cosine_distances(embeddings, self._centroids_data)
+
+        if self.verbose:
+            print("Sorting distances ...")
         sorted_distances_indices = np.argsort(distances, axis=1)
+
+        if self.verbose:
+            print("Retrieved closest hashtags ...")
         recommended_hashtags = self._corresponding_to_centroids_data_hashtags[
             sorted_distances_indices
         ]
+
+        if self.verbose:
+            print("Postprocessing resutls ...")
         result = self.post_process_result(recommended_hashtags)
 
         return result
 
-    @classmethod
     def post_process_result(
-        cls, recommended_hashtags: np.ndarray
+        self, recommended_hashtags: np.ndarray
     ) -> np.ndarray:
         """
         Flattens lists of recommended hashtags for each tweet. Two level list
@@ -207,8 +224,15 @@ class DBScanBasedMethod(Method):
         :return: np.ndarray of flattened list of recommended tags.
         """
         result = []
-        for tweet_tags in recommended_hashtags:
-            result.append(
-                [tag for centroid_tags in tweet_tags for tag in centroid_tags]
-            )
+        for tweet_tags in tqdm.tqdm(
+            recommended_hashtags,
+            disable=not self.verbose,
+            desc="Postprocessing tweets ..."
+        ):
+            row_tags = []
+            for centroid_tags in tweet_tags:
+                if len(row_tags) > self.max_tags_to_return:
+                    break
+                row_tags.extend(list(centroid_tags))
+            result.append(row_tags[:self.max_tags_to_return])
         return np.asarray(result)

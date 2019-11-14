@@ -9,3 +9,4 @@ path_to_keyedvectors_model: "models/keyedvectors/kgr10.plain.lemma.skipgram.dim3
 minimal_hashtag_occurrence: 10
 neighbours_count: 16
 verbose: true
+max_tags_to_return: 1000
