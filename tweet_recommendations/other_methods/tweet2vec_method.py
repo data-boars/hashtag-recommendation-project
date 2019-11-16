@@ -6,7 +6,7 @@ The original code is available at: https://github.com/bdhingra/tweet2vec
 import os
 
 os.environ["THEANO_FLAGS"] = (
-    "floatX=float32," "device=cuda4," "dnn.enabled=False,"
+    "floatX=float32," "device=cuda," "dnn.enabled=False,"
 )
 
 import pickle as pkl
