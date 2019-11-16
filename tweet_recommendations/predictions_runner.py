@@ -165,6 +165,13 @@ def make_predictions(
     if isinstance(train_predictions, np.ndarray):
         train_predictions = train_predictions[:, :PREDICTIONS_LIMIT].tolist()
         test_predictions = test_predictions[:, :PREDICTIONS_LIMIT].tolist()
+    else:
+        train_predictions = [
+            row[:PREDICTIONS_LIMIT] for row in train_predictions
+        ]
+        test_predictions = [
+            row[:PREDICTIONS_LIMIT] for row in test_predictions
+        ]
 
     train_y_pred_true_frame = pd.DataFrame(
         data={
