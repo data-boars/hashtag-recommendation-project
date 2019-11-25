@@ -5,5 +5,5 @@ python -m tweet_recommendations.predictions_runner \
     --dataset data/processed/udi \
     --output experiments \
     --class tweet_recommendations.other_methods.Tweet2Vec \
-    --config tweet_recommendations/configs/tweet2vec_method_our_dataset_predictions.yml \
+    --config tweet_recommendations/configs/tweet2vec_method_udi_dataset_predictions.yml \
     --split followers
