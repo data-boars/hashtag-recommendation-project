@@ -7,4 +7,6 @@ echo "=== DBScan - UDI ===" \
     && echo "=== Our - UDI ===" \
     && ./tweet_recommendations/scripts/predictions_our_method_w2v_udi_dataset.sh \
     && echo "=== Tweet2Vec - UDI ===" \
-    && ./tweet_recommendations/scripts/predictions_tweet2vec_method_udi_dataset.sh
+    && ./tweet_recommendations/scripts/predictions_tweet2vec_method_udi_dataset.sh \
+    && echo "=== Our Tweet2Vec - UDI ===" \
+    && ./tweet_recommendations/scripts/predictions_our_method_tweet2vec_udi_dataset.sh

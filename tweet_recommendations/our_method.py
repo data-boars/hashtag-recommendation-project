@@ -1,5 +1,5 @@
-import enum
 import abc
+import enum
 from typing import Optional, Sequence, Tuple, Union
 
 import networkx as nx
@@ -10,6 +10,7 @@ from gensim.models import KeyedVectors
 from sklearn.metrics.pairwise import cosine_similarity
 
 from tweet_recommendations.method import Method
+from tweet_recommendations.other_methods import Tweet2VecFeatureExtractor
 from tweet_recommendations.utils.clients import get_wcrft2_results_for_text
 
 
@@ -373,4 +374,73 @@ class OurMethodW2V(OurMethodBase):
         processed = list(processed)
         if len(processed[0].shape) > 1:
             processed = [emb.mean(axis=0) for emb in x]
+        return processed
+
+
+class OurMethodTweet2Vec(OurMethodBase):
+    def __init__(
+        self,
+        model_path: str,
+        popularity_to_similarity_ratio: float,
+        popularity_measure: PopularityMeasure = "pagerank",
+        last_epoch: Optional[int] = None,
+        embedding_name: Optional[str] = "embedding",
+        personalised_pagerank: bool = True,
+        weighted_pagerank: bool = True,
+        verbose: bool = False,
+    ):
+        """
+        Our proposed hashtag recommendation method.
+
+        :param model_path: Path to Tweet2Vec model that was pretrained on a
+            particular dataset. Assumes path to the folder.
+        :param popularity_to_similarity_ratio: This ratio decides which is
+                more important: semantic similarity vs hashtag popularity.
+                0 means that only similarity matters,
+                1 means that only popularity matters,
+                0.5 means that both of the above should matter the same.
+        :param popularity_measure: Popularity measure to be used.
+                Available measures are: `pagerank` and `mean_retweets`.
+        :param last_epoch: Optional argument for pointing for a particular
+            file of weights. If None, the the weights from the last epoch are
+            taken.
+        :param embedding_name: Optional, name of used embedding method.
+                Required when `path_to_keyedvectors_model` is not provided.
+                Input DataFrame in `fit` method will have to contain column
+                named the same as value provided to this argument.
+                If `path_to_keyedvectors_model` is provided `embedding_name`
+                is ignored and is just used as a name.
+        :param personalised_pagerank: Whether to use tweet retweets and hashtag
+                mean retweets as personalisation vector in PageRank algorithm.
+                Default is `True`.
+        :param weighted_pagerank: Whether to use tweet-hashtag embedding
+                similarity as weights in PageRank algorithm. Default is `True`.
+        :param verbose: Whether method should be verbose.
+        """
+        super().__init__(
+            popularity_to_similarity_ratio,
+            popularity_measure,
+            embedding_name,
+            personalised_pagerank,
+            weighted_pagerank,
+            verbose,
+        )
+        self.embedding_model = Tweet2VecFeatureExtractor(
+            model_path, self.verbose, last_epoch
+        )
+
+    def preprocess_transformed_text(
+        self,
+        x: Union[Sequence[Sequence[str]], Sequence[str], Sequence[np.ndarray]],
+    ) -> Sequence[Sequence[str]]:
+        return x
+
+    def embed_text(
+        self, x: Union[pd.DataFrame, pd.Series, Sequence[Sequence[str]]]
+    ):
+        if isinstance(x, pd.DataFrame):
+            x = x["lemmas"]
+        if type(x) not in [list, tuple]:
+            x = list(x)
+        processed = list(self.embedding_model.transform(x))
         return processed
