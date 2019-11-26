@@ -6,7 +6,7 @@ The original code is available at: https://github.com/bdhingra/tweet2vec
 import os
 
 os.environ["THEANO_FLAGS"] = (
-    "floatX=float32," "device=cuda," "dnn.enabled=False,"
+    "floatX=float32," "device=cuda3," "dnn.enabled=False,"
 )
 
 import pickle as pkl
@@ -88,7 +88,7 @@ class Tweet2Vec(Method):
         for key, index in self.labeldict.items():
             self.classnum_to_label_map[index] = key
 
-    def _load_partial_model(self):
+    def load_partial_model(self):
         """Load all necessary data so the model can work properly.
 
         This includes  a dict with mapping from a single character to its
@@ -106,7 +106,7 @@ class Tweet2Vec(Method):
             len(list(self.labeldict.keys())) + 1, self.max_classes
         )
 
-    def _load_weights(self):
+    def load_weights(self):
         """Load weights of the model.
 
         If the `last_epoch` is provided, then weights from file
@@ -121,7 +121,7 @@ class Tweet2Vec(Method):
         else:
             self.params = t2v.load_params(self._get_last_model().as_posix())
 
-    def _build_network(self, load_params: bool = False):
+    def build_network(self, load_params: bool = False):
         """Build network, including inputs, weights and the whole structure."""
         # Tweet variables
         self.tweet_input = T.itensor3()
@@ -132,7 +132,7 @@ class Tweet2Vec(Method):
         # classification params
         self.params["W_cl"] = theano.shared(
             np.random.normal(
-                loc=0.,
+                loc=0.0,
                 scale=settings_char.SCALE,
                 size=(settings_char.WDIM, self.n_classes),
             ).astype("float32"),
@@ -143,7 +143,7 @@ class Tweet2Vec(Method):
         )
 
         if load_params:
-            self._load_weights()
+            self.load_weights()
         # network for prediction
         predictions, net, embeddings = self._classify(
             self.tweet_input,
@@ -240,9 +240,9 @@ class Tweet2Vec(Method):
         )
 
         if self.last_epoch is not None and self.last_epoch >= 0:
-            self._build_network(load_params=True)
+            self.build_network(load_params=True)
         else:
-            self._build_network(load_params=False)
+            self.build_network(load_params=False)
 
         # iterators
         train_iter = batch.BatchTweets(
@@ -259,11 +259,11 @@ class Tweet2Vec(Method):
         # Training
         self._print("Training...")
         uidx = 0
-        maxp = 0.
+        maxp = 0.0
         try:
             for epoch in range(self.epochs):
                 n_samples = 0
-                train_cost = 0.
+                train_cost = 0.0
                 self._print(("Epoch {}".format(epoch)))
                 for xr, y in train_iter:
                     n_samples += len(xr)
@@ -350,8 +350,8 @@ class Tweet2Vec(Method):
         """
         # Model
         if self.params is None:
-            self._load_partial_model()
-            self._build_network(load_params=True)
+            self.load_partial_model()
+            self.build_network(load_params=True)
 
         if type(x[0]) in [tuple, list, np.ndarray]:
             x = [" ".join(entry) for entry in x]
@@ -467,3 +467,61 @@ class Tweet2Vec(Method):
                 new_x.append(x_sample)
                 new_y.append(tag)
         return new_x, new_y
+
+
+class Tweet2VecFeatureExtractor(Method):
+    def __init__(
+        self,
+        model_path: str,
+        verbose: bool = False,
+        last_epoch: Optional[int] = None,
+    ):
+        self.model_path = Path(model_path)
+        self.tweet2vec_model = Tweet2Vec(0, model_path, verbose, last_epoch)
+        self.verbose = verbose
+
+    def fit(
+        self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params
+    ) -> "Method":
+        return self
+
+    def transform(
+        self,
+        x: Union[Tuple[Tuple[str, ...], ...], Tuple[str, ...]],
+        **transform_params
+    ) -> np.ndarray:
+        if self.tweet2vec_model.params is None:
+            self.tweet2vec_model.load_partial_model()
+            self.tweet2vec_model.build_network(load_params=True)
+        if type(x[0]) in [tuple, list, np.ndarray]:
+            x = [" ".join(entry) for entry in x]
+
+        # iterators
+        test_iter = batch.BatchTweets(
+            x,
+            None,
+            self.tweet2vec_model.labeldict,
+            batch_size=settings_char.N_BATCH,
+            max_classes=self.tweet2vec_model.max_classes,
+            test=True,
+            shuffle=False,
+        )
+
+        # Test
+        self._print("Testing...")
+        out_pred = []
+        for xr, y in test_iter:
+            x, x_m = batch.prepare_data(
+                xr,
+                self.tweet2vec_model.chardict,
+                n_chars=self.tweet2vec_model.n_char,
+            )
+            embeddings = self.tweet2vec_model.encode(x, x_m)
+            out_pred.append(embeddings)
+
+        output = np.concatenate(out_pred, axis=0)
+        return output
+
+    def _print(self, msg: str) -> None:
+        if self.verbose:
+            print(msg)

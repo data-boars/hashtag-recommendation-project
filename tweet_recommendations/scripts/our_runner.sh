@@ -5,6 +5,6 @@ echo "=== DBScan - Our ===" \
     && echo "=== Graph - Our ===" \
     && ./tweet_recommendations/scripts/predictions_graph_based_method_our_dataset.sh \
     && echo "=== Our - Our ===" \
-    && ./tweet_recommendations/scripts/predictions_our_method_our_dataset.sh \
+    && ./tweet_recommendations/scripts/predictions_our_method_w2v_our_dataset.sh \
     && echo "=== Tweet2Vec - Our ===" \
     && ./tweet_recommendations/scripts/predictions_tweet2vec_method_our_dataset.sh

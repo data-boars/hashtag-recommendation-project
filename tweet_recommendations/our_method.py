@@ -1,4 +1,5 @@
 import enum
+import abc
 from typing import Optional, Sequence, Tuple, Union
 
 import networkx as nx
@@ -17,12 +18,11 @@ class PopularityMeasure(enum.Enum):
     MeanRetweets = "mean_retweets"
 
 
-class OurMethod(Method):
+class OurMethodBase(Method, abc.ABC):
     def __init__(
         self,
         popularity_to_similarity_ratio: float,
         popularity_measure: PopularityMeasure = "pagerank",
-        path_to_keyedvectors_model: Optional[str] = None,
         embedding_name: Optional[str] = "embedding",
         personalised_pagerank: bool = True,
         weighted_pagerank: bool = True,
@@ -38,13 +38,6 @@ class OurMethod(Method):
                 0.5 means that both of the above should matter the same.
         :param popularity_measure: Popularity measure to be used.
                 Available measures are: `pagerank` and `mean_retweets`.
-        :param path_to_keyedvectors_model: Optional argument. Path to `gensim`
-                model converted by script `convert_embedding_model_to_mmap.py`.
-                It can be either word2vec or fasttext, `gensim` handles both.
-                When path isn't set, `embedding_name` argument is required.
-                Also `fit` and `transform` won't accept text input and will
-                have to contain column named the same as `embedding_name`.
-                You will have to provide precomputed embeddings.
         :param embedding_name: Optional, name of used embedding method.
                 Required when `path_to_keyedvectors_model` is not provided.
                 Input DataFrame in `fit` method will have to contain column
@@ -70,14 +63,23 @@ class OurMethod(Method):
         self._personalised_pagerank = personalised_pagerank
 
         self.embedding_model = None
-        if path_to_keyedvectors_model is not None:
-            self.embedding_model = KeyedVectors.load(
-                path_to_keyedvectors_model, mmap="r"
-            )
         self.verbose = verbose
 
-        self._G: nx.Graph = None
-        self._hashtags_df: pd.DataFrame = None
+        self._G: Optional[nx.Graph] = None
+        self._hashtags_df: Optional[pd.DataFrame] = None
+
+    @abc.abstractmethod
+    def preprocess_transformed_text(
+        self,
+        x: Union[Tuple[Tuple[str, ...]], Tuple[str, ...], Tuple[np.ndarray]],
+    ):
+        pass
+
+    @abc.abstractmethod
+    def embed_text(
+        self, x: Union[pd.DataFrame, pd.Series, Sequence[Sequence[str]]]
+    ):
+        pass
 
     def fit(
         self, x: pd.DataFrame, y: Optional[pd.DataFrame] = None, **fit_params
@@ -86,13 +88,10 @@ class OurMethod(Method):
         min_hashtag_count = fit_params.get("min_hashtag_count", 10)
 
         if self.embedding_model is None:
-            assert (
-                self.embedding_name in x.columns
-            ), "When no embedding model provided, input DataFrame should " f"contain column named same as `{self.embedding_name}`."
-        else:
-            assert (
-                "lemmas" in x.columns
-            ), "When embedding model is provided input DataFrame should " 'contain column "lemmas".'
+            assert self.embedding_name in x.columns, (
+                "When no embedding model provided, input DataFrame should "
+                f"contain column named same as `{self.embedding_name}`."
+            )
 
         x = x[x["hashtags"].str.len() > 0]
         if self.verbose:
@@ -107,7 +106,7 @@ class OurMethod(Method):
             )
 
         if self.embedding_model is not None:
-            x[self.embedding_name] = self.embed_lemmas(x["lemmas"])
+            x[self.embedding_name] = self.embed_text(x)
         else:
             assert (
                 len(x[self.embedding_name].iloc[0].shape) == 1
@@ -142,31 +141,6 @@ class OurMethod(Method):
         ]
         self._hashtags_df = pd.DataFrame(hashtags)
 
-    def embed_lemmas(
-        self, texts_lemmas: Union[Sequence[Sequence[str]], pd.Series]
-    ):
-        if not isinstance(texts_lemmas, pd.Series):
-            texts_lemmas = pd.Series(texts_lemmas)
-
-        def _embed_text(lemmas):
-            vectors = []
-            for word in lemmas:
-                try:
-                    vectors.append(self.embedding_model.word_vec(word.lower()))
-                except KeyError:
-                    continue
-            if len(vectors) > 0:
-                return np.asarray(vectors).mean(axis=0)
-            else:
-                return None
-
-        if self.verbose:
-            print("Embedding lemmas")
-            tqdm.tqdm.pandas()
-            return texts_lemmas.progress_apply(_embed_text)
-        else:
-            return texts_lemmas.apply(_embed_text)
-
     def transform(
         self,
         x: Union[Tuple[Tuple[str, ...]], Tuple[str, ...], Tuple[np.ndarray]],
@@ -175,16 +149,11 @@ class OurMethod(Method):
 
         x = list(x)
         # tokenize and lemmatize text
-        if isinstance(x[0], str):
-            x = [get_wcrft2_results_for_text(txt) for txt in x]
+        x = self.preprocess_transformed_text(x)
 
         # turn tokens to embeddings
         if isinstance(x[0], list):
-            x = list(self.embed_lemmas(x))
-
-        # calculate mean tweet embeddings
-        if len(x[0].shape) > 1:
-            x = [emb.mean(axis=0) for emb in x]
+            x = list(self.embed_text(x))
 
         hashtag_emb = np.asarray(
             self._hashtags_df[self.embedding_name].tolist()
@@ -309,3 +278,99 @@ class OurMethod(Method):
 
             edge_features["distance"] = 1 - sim
             edge_features["similarity"] = sim
+
+
+class OurMethodW2V(OurMethodBase):
+    def __init__(
+        self,
+        popularity_to_similarity_ratio: float,
+        popularity_measure: PopularityMeasure = "pagerank",
+        path_to_keyedvectors_model: Optional[str] = None,
+        embedding_name: Optional[str] = "embedding",
+        personalised_pagerank: bool = True,
+        weighted_pagerank: bool = True,
+        verbose: bool = False,
+    ):
+        """
+        Our proposed hashtag recommendation method.
+
+        :param popularity_to_similarity_ratio: This ratio decides which is
+                more important: semantic similarity vs hashtag popularity.
+                0 means that only similarity matters,
+                1 means that only popularity matters,
+                0.5 means that both of the above should matter the same.
+        :param popularity_measure: Popularity measure to be used.
+                Available measures are: `pagerank` and `mean_retweets`.
+        :param path_to_keyedvectors_model: Optional argument. Path to `gensim`
+                model converted by script `convert_embedding_model_to_mmap.py`.
+                It can be either word2vec or fasttext, `gensim` handles both.
+                When path isn't set, `embedding_name` argument is required.
+                Also `fit` and `transform` won't accept text input and will
+                have to contain column named the same as `embedding_name`.
+                You will have to provide precomputed embeddings.
+        :param embedding_name: Optional, name of used embedding method.
+                Required when `path_to_keyedvectors_model` is not provided.
+                Input DataFrame in `fit` method will have to contain column
+                named the same as value provided to this argument.
+                If `path_to_keyedvectors_model` is provided `embedding_name`
+                is ignored and is just used as a name.
+        :param personalised_pagerank: Whether to use tweet retweets and hashtag
+                mean retweets as personalisation vector in PageRank algorithm.
+                Default is `True`.
+        :param weighted_pagerank: Whether to use tweet-hashtag embedding
+                similarity as weights in PageRank algorithm. Default is `True`.
+        :param verbose: Whether method should be verbose.
+        """
+        super().__init__(
+            popularity_to_similarity_ratio,
+            popularity_measure,
+            embedding_name,
+            personalised_pagerank,
+            weighted_pagerank,
+            verbose,
+        )
+
+        if path_to_keyedvectors_model is not None:
+            self.embedding_model = KeyedVectors.load(
+                path_to_keyedvectors_model, mmap="r"
+            )
+
+    def preprocess_transformed_text(
+        self,
+        x: Union[Sequence[Sequence[str]], Sequence[str], Sequence[np.ndarray]],
+    ) -> Sequence[Sequence[str]]:
+        if isinstance(x[0], str):
+            return [get_wcrft2_results_for_text(txt) for txt in x]
+        return x
+
+    def embed_text(
+        self, x: Union[pd.DataFrame, pd.Series, Sequence[Sequence[str]]]
+    ):
+        if isinstance(x, pd.DataFrame):
+            x = x["lemmas"]
+        if not isinstance(x, pd.Series):
+            x = pd.Series(x)
+
+        def _embed_text(lemmas):
+            vectors = []
+            for word in lemmas:
+                try:
+                    vectors.append(self.embedding_model.word_vec(word.lower()))
+                except KeyError:
+                    continue
+            if len(vectors) > 0:
+                return np.asarray(vectors).mean(axis=0)
+            else:
+                return None
+
+        if self.verbose:
+            print("Embedding lemmas")
+            tqdm.tqdm.pandas()
+            processed = x.progress_apply(_embed_text)
+        else:
+            processed = x.apply(_embed_text)
+
+        processed = list(processed)
+        if len(processed[0].shape) > 1:
+            processed = [emb.mean(axis=0) for emb in x]
+        return processed
