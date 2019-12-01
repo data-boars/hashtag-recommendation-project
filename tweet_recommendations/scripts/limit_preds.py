@@ -6,7 +6,7 @@ import tqdm
 
 
 def limit_from_frame(frame: pd.DataFrame, limit: int) -> pd.DataFrame:
-    preds = frame.pred.tolist()
+    preds = frame["pred"].tolist()
     new_preds = [row[:limit] for row in preds]
     frame.pred = new_preds
     return frame
