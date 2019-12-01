@@ -95,8 +95,7 @@ def load_model_from_path(
 def extract_ground_truth_from_frame(
     frame: pd.DataFrame
 ) -> t.List[t.List[str]]:
-    hashtags = frame["hashtags"]
-    return [[tag["text"] for tag in a_row] for a_row in hashtags]
+    return frame["hashtags_list"].tolist()
 
 
 def time_exectuion(
