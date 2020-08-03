@@ -59,4 +59,4 @@ FastText word embeddings were provided by CLARIN-PL:
 - Kocoń, Jan, 2018, KGR10 FastText Polish word embeddings, CLARIN-PL digital repository, http://hdl.handle.net/11321/606.
 
 ## Poster
-![poster][./poster.png "Poster"]
+![poster](./poster.png "Poster")
