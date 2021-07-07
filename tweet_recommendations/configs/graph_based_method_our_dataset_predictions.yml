@@ -1,0 +1,5 @@
+minimal_random_walk_change_difference_value: 0.001
+damping_factor: 0.7
+max_iterations: 20
+minimal_hashtag_occurrence: 10
+verbose: true

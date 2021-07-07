@@ -1,0 +1,12 @@
+# a path to the model which was previously converted using the following
+# command:
+# tweet_recommendations/scripts/convert_embeddings_model_to_mmap \
+#  --fast \
+#  models/keyedvectors/<name_of_the_model>.bin \
+#  models/keyedvectors/<the_same_name_of_the_model>.bin
+path_to_keyedvectors_model: "models/keyedvectors/kgr10.plain.lemma.skipgram.dim300.neg10.bin"
+
+minimal_hashtag_occurrence: 10
+neighbours_count: 16
+verbose: true
+max_tags_to_return: 1000
